@@ -14,7 +14,7 @@
 <meta name="apple-mobile-web-app-title" content="Simulador">
 </head>
 <body>
-<script>window.SIM_VERSION="3d89b6af90";window.SIM_SUPA=null;</script>
+<script>window.SIM_VERSION="2fd28d7897";window.SIM_SUPA=null;</script>
 <title>Simulador de Reacción</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -179,7 +179,7 @@
       <div><div class="lbl">Velocidad</div><div class="seg" id="spRow"></div></div>
       <div class="ctl">
         <button id="bPause" data-act="pause">⏸ Pausa<kbd>Espacio</kbd></button>
-        <button id="bFF" data-act="ff">⏩<span class="lg"> Hasta la zona</span><span class="sm"> Zona</span><kbd>F</kbd></button>
+        <button id="bFF" data-act="ff"><span id="ffTxt">⏭ Ir a la zona</span><kbd>F</kbd></button>
         <button id="bFib" data-act="fib"><span class="lg">Corregir Fibo</span><span class="sm">✎ Fibo</span><kbd>C</kbd></button>
         <button id="bOrig" data-act="orig" title="Fibo original"><span class="lg">Fibo original</span><span class="sm">↺ Orig.</span></button>
         <button id="bSkip" data-act="skip">Saltar<kbd>S</kbd></button>
@@ -237,6 +237,10 @@
       <label class="chk"><input type="checkbox" id="cfDiag"> Línea del tramo</label>
       <label class="chk"><input type="checkbox" id="cfLabels"> Precios en las líneas</label>
     </div></div>
+  <div><div class="clbl">Reproducción</div>
+    <div class="cchk">
+      <label class="chk"><input type="checkbox" id="cfAuto"> Empezar cada caso en la zona</label>
+    </div></div>
   <div><div class="clbl">Texto del gráfico</div><div class="seg" id="cfFont">
     <button data-v="10">Pequeño</button><button data-v="12">Normal</button><button data-v="14">Grande</button></div></div>
   <div class="row"><button class="on" id="cfClose" style="flex:1">Listo</button><button id="cfReset">Restablecer</button></div>
@@ -262,7 +266,7 @@ let viewTf = 5, nCandles = 120, speed = 1;
 // ---------- ajustes de visualizacion (se guardan en este dispositivo) ----------
 const CKEY = 'sim_ajustes_v1';
 const CFG_DEF = { tema:'oscuro', up:'#22a495', down:'#e5534b', hollow:false, width:0.7, fib:'#d6a630', tp:'#5b9cf5',
-                  grid:true, band:true, strip:true, f618:true, diag:true, labels:true, font:12 };
+                  grid:true, band:true, strip:true, f618:true, diag:true, labels:true, font:12, autoZona:false };
 const THEMES = {
   oscuro:{ bg:'#0e1116', grid:'#1a2028', axis:'#5b6576', cur:'#c9ced6', curTxt:'#111', fg:'#ffffff', f0:'#8a94a4' },
   negro: { bg:'#000000', grid:'#15171b', axis:'#6b7280', cur:'#d0d4da', curTxt:'#000', fg:'#ffffff', f0:'#8a94a4' },
@@ -372,7 +376,8 @@ function refresh() {
   $('bPause').firstChild.textContent = S.paused ? '▶ Seguir' : '⏸ Pausa';
   $('bPause').classList.toggle('on', S.paused);
   $('pausedTag').hidden = !(S.paused && canPause && !S.fibMode);
-  $('bFF').disabled = !live; $('bFF').classList.toggle('on', S.ff);
+  $('bFF').disabled = !(live || S.phase === 'reveal'); $('bFF').classList.remove('on');
+  $('ffTxt').textContent = S.phase === 'reveal' ? '⏭ Ver resultado' : (innerWidth < 900 ? '⏭ Zona' : '⏭ Ir a la zona');
   ['bEntro','bNo','bSkip'].forEach(k => $(k).disabled = !live);
   $('bFib').disabled = !live;
   $('bFib').classList.toggle('on', !!S.fibMode);
@@ -383,7 +388,28 @@ function togglePause() {
   S.paused = !S.paused; if (S.paused && S.phase === 'live') S.pauses++;
   S.last = performance.now(); refresh();
 }
-function toggleFF() { if (!S || S.phase !== 'live') return; S.ff = !S.ff; if (S.ff) { S.ffUsed = true; S.paused = false; } refresh(); }
+// Salto instantaneo: antes de decidir, al momento en que el precio llega cerca de la zona 0,78-1 (y luego, a la entrada en la zona);
+// despues de decidir, directamente al resultado. Se reproduce a 1x desde el punto de llegada.
+function advanceTo(j) {
+  j = Math.min(j, S.n - 1);
+  while (S.idx <= j) { pushTick(S.idx); S.idx++; }
+  S.clock = S.t[S.idx - 1]; S.last = performance.now();
+}
+function jumpZone(auto) {
+  if (!S) return;
+  if (S.phase === 'reveal') { advanceTo(S.n - 1); onEnd(); return; }
+  if (S.phase !== 'live') return;
+  const inBand = i => distUsd(usd(S.b[i])) === 0, near = i => distUsd(usd(S.b[i])) <= Math.min(S.far, 6);
+  let j = -1;
+  if (!S.warned) for (let i = S.idx; i < S.n; i++) { if (near(i)) { j = i; break; } }
+  if (j < 0) for (let i = S.idx; i < S.n; i++) { if (inBand(i)) { j = i; break; } }
+  if (j < 0) { if (!auto) banner('En este caso el precio ya no llega a la zona · pulsa Saltar', 2500); return; }
+  advanceTo(j);
+  S.warned = true; S.ff = false; S.jumps = (S.jumps || 0) + 1; S.ffUsed = true; speed = 1;
+  if (!auto) S.paused = false;
+  banner((inBand(j) ? 'En la zona 0,78–1' : 'Precio llegando a la zona') + ' · 1×', 1800); refresh();
+}
+function toggleFF() { jumpZone(false); }
 let bannerTimer = 0;
 function banner(text, ms) { const b = $('banner'); b.textContent = text; b.hidden = false; clearTimeout(bannerTimer); if (ms) bannerTimer = setTimeout(() => b.hidden = true, ms); }
 
@@ -427,6 +453,7 @@ async function load(p) {
     $('bEntro').innerHTML = (ep.side > 0 ? 'ENTRO · COMPRA' : 'ENTRO · VENTA') + '<kbd>E</kbd>';
     $('resultBox').hidden = true;
     refresh();
+    if (CFG.autoZona) jumpZone(true);
   } catch (e) { banner('No se pudo cargar el caso: ' + e.message); }
   busy = false;
 }
@@ -726,7 +753,7 @@ async function save(withSl) {
     precio_entrada:d.kind === 'entro' ? d.price : null, sl:S.sl, nota:$('ovNote').value.trim(),
     fib:{ f1:ep.f1, f0:ep.f0 }, fib_original:!S.fibFix, fib_corregido:S.fibFix,
     zona:{ lo:S.zLo, hi:S.zHi, toques:S.touches },
-    velocidad:speed, pausas:S.pauses, cambios_velocidad:S.speedChanges, rapido_usado:S.ffUsed,
+    velocidad:speed, pausas:S.pauses, cambios_velocidad:S.speedChanges, rapido_usado:S.ffUsed, saltos_a_zona:S.jumps || 0,
     vista:TFS.find(x => x[1] === viewTf)[0], velas_visibles:nCandles,
     ms_desde_toque_0_78:S.firstTouch >= 0 ? S.t[i] - S.t[S.firstTouch] : null,
     ms_desde_toque_zona:S.firstZone >= 0 ? S.t[i] - S.t[S.firstZone] : null,
@@ -801,7 +828,7 @@ $('bShare').addEventListener('click', async () => {
   catch (e) { banner(url, 6000); }
 });
 // Panel de ajustes: cada cambio se aplica al momento y se guarda.
-const CF_CHK = { cfHollow:'hollow', cfGrid:'grid', cfBand:'band', cfStrip:'strip', cf618:'f618', cfDiag:'diag', cfLabels:'labels' };
+const CF_CHK = { cfHollow:'hollow', cfGrid:'grid', cfBand:'band', cfStrip:'strip', cf618:'f618', cfDiag:'diag', cfLabels:'labels', cfAuto:'autoZona' };
 const CF_COL = { cfUp:'up', cfDown:'down', cfFib:'fib', cfTp:'tp' };
 function syncCfgUi() {
   for (const id in CF_CHK) $(id).checked = !!CFG[CF_CHK[id]];
