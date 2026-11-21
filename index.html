@@ -14,7 +14,7 @@
 <meta name="apple-mobile-web-app-title" content="Simulador">
 </head>
 <body>
-<script>window.SIM_VERSION="41d0acd59e";window.SIM_SUPA=null;</script>
+<script>window.SIM_VERSION="3d89b6af90";window.SIM_SUPA=null;</script>
 <title>Simulador de Reacción</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -70,6 +70,16 @@
            padding:14px; display:flex; flex-direction:column; gap:10px; box-shadow:0 10px 30px #000a; }
   .scrim { position:fixed; inset:0; background:#0009; z-index:4; }
   .sheet h2 { margin:0; font-size:16px; }
+  .sheet { overflow:auto; }
+  /* Barra para arrastrar la ventana a cualquier sitio; el boton la pliega para ver el grafico. */
+  .grip { display:flex; align-items:center; gap:8px; cursor:grab; touch-action:none; user-select:none; -webkit-user-select:none;
+          margin:-6px -6px 0; padding:4px 6px; border-radius:7px; }
+  .grip:active { cursor:grabbing; }
+  .grip::before { content:'⠿'; color:var(--muted); font-size:16px; line-height:1; }
+  .grip h2 { flex:1; min-width:0; }
+  .minb { padding:2px 11px; font-size:15px; line-height:1.2; flex:none; }
+  .sheet.min { gap:0; }
+  .sheet.min > :not(.grip) { display:none !important; }
   textarea { width:100%; min-height:60px; background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:6px; padding:8px; font:inherit; resize:vertical; }
   .muted { color:var(--muted); }
   /* Mandos de reproduccion y Fibo: en escritorio dos filas (2 + 3 botones); en movil vertical una sola fila de 5. */
@@ -197,7 +207,7 @@
   </div>
 </div>
 <div class="sheet" id="resultBox" hidden>
-  <h2>Qué pasó después</h2>
+  <div class="grip"><h2>Qué pasó después</h2><button class="minb" aria-label="Plegar">–</button></div>
   <div id="result"></div>
   <div class="row">
     <button class="big on" id="bNext" data-act="next" style="flex:1">Siguiente caso<kbd>→</kbd></button>
@@ -205,7 +215,7 @@
   </div>
 </div>
 <div class="sheet cfg" id="cfgBox" hidden>
-  <h2>Ajustes</h2>
+  <div class="grip"><h2>Ajustes</h2><button class="minb" aria-label="Plegar">–</button></div>
   <div><div class="clbl">Tema</div><div class="seg" id="cfTema">
     <button data-v="oscuro">Oscuro</button><button data-v="negro">Negro</button><button data-v="claro">Claro</button></div></div>
   <div><div class="clbl">Velas</div>
@@ -233,7 +243,7 @@
 </div>
 <div class="scrim" id="scrim" hidden></div>
 <div class="sheet" id="sheet" hidden>
-  <h2 id="ovTitle"></h2>
+  <div class="grip"><h2 id="ovTitle"></h2><button class="minb" aria-label="Plegar">–</button></div>
   <div id="ovSl" class="muted"></div>
   <textarea id="ovNote" placeholder="¿Qué viste en la vela para decidir? (opcional, pero muy útil)"></textarea>
   <div class="row"><button id="ovSave" class="on">Guardar</button><button id="ovNoSl">Guardar sin SL</button><button id="ovCancel">Cancelar</button></div>
@@ -364,9 +374,9 @@ function refresh() {
   $('pausedTag').hidden = !(S.paused && canPause && !S.fibMode);
   $('bFF').disabled = !live; $('bFF').classList.toggle('on', S.ff);
   ['bEntro','bNo','bSkip'].forEach(k => $(k).disabled = !live);
-  $('bFib').disabled = !(live || S.phase === 'slpick');
+  $('bFib').disabled = !live;
   $('bFib').classList.toggle('on', !!S.fibMode);
-  $('bOrig').disabled = !(S.fibFix && (live || S.phase === 'slpick'));
+  $('bOrig').disabled = !(S.fibFix && live);
 }
 function togglePause() {
   if (!S || !(S.phase === 'live' || S.phase === 'reveal')) return;
@@ -590,15 +600,28 @@ function anchors() {
 }
 function endFibMode() { S.fibMode = 0; S.fibTmp = null; if (S.resumeAfterFib) { S.paused = false; S.resumeAfterFib = false; } refresh(); }
 function restoreFib() {
-  if (!S || !S.fibFix) return;
+  if (!S || !S.fibFix || S.phase !== 'live') return;
   S.fibFix = null; setFib(ep.orig.f1, ep.orig.f0, ep.orig.zlo, ep.orig.zhi, ep.orig.t);
   S.firstTouch = -1; S.firstZone = -1; S.warned = false; banner('Fibo original', 1500); refresh();
 }
 // Arrastre de las lineas 1 y 0: se pulsa cerca de una de ellas y se mueve; al soltar se ajusta al cuerpo mas cercano.
-let drag = null, suppressClick = false;
+// Mientras se elige el SL, el Fibo queda bloqueado: tocar o arrastrar el grafico solo coloca y mueve el SL.
+let drag = null, slDrag = false, suppressClick = false;
+function setSl(p) {
+  S.sl = Math.round(p * 100) / 100;
+  const wrong = ep.side * (pending.price - S.sl) <= 0;
+  $('ovSl').textContent = 'SL en ' + fmt(S.sl) + ' (riesgo ' + fmt(Math.abs(pending.price - S.sl)) + ' USD).' +
+    (wrong ? ' Ojo: está al otro lado de la entrada.' : ' Arrastra en el gráfico para moverlo.');
+}
 cv.addEventListener('pointerdown', ev => {
-  if (!S || !geo || pinch || !(S.phase === 'live' || S.phase === 'slpick')) return;
-  const r = cv.getBoundingClientRect(), yy = ev.clientY - r.top, Y = v => geo.ph - (v - geo.lo) / (geo.hi - geo.lo) * geo.ph;
+  if (!S || !geo || pinch) return;
+  const r = cv.getBoundingClientRect();
+  if (S.phase === 'slpick' && pending) {
+    if (ev.clientX - r.left > geo.pw) return;
+    slDrag = true; setSl(priceAt(ev)); cv.setPointerCapture(ev.pointerId); ev.preventDefault(); return;
+  }
+  if (S.phase !== 'live') return;
+  const yy = ev.clientY - r.top, Y = v => geo.ph - (v - geo.lo) / (geo.hi - geo.lo) * geo.ph;
   const d1 = Math.abs(yy - Y(ep.f1)), d0 = Math.abs(yy - Y(ep.f0)), tol = ev.pointerType === 'touch' ? 22 : 10;
   if (S.fibMode || Math.min(d1, d0) > tol || ev.clientX - r.left > geo.pw) return;
   drag = { which:d1 <= d0 ? 1 : 0, resume:S.phase === 'live' && !S.paused, moved:false };
@@ -606,28 +629,27 @@ cv.addEventListener('pointerdown', ev => {
   cv.setPointerCapture(ev.pointerId); ev.preventDefault(); refresh();
 });
 cv.addEventListener('pointermove', ev => {
+  if (slDrag) { if (S.phase === 'slpick' && pending) setSl(priceAt(ev)); return; }
   if (!drag) return;
   drag.moved = true;
   const p = snapBody(ev), cur = anchors();
   if (drag.which === 1) applyFib(p, cur.z, true); else applyFib(cur.a, p, true);
 });
 cv.addEventListener('pointerup', ev => {
+  if (slDrag) { slDrag = false; suppressClick = true; return; }
   if (!drag) return;
   const d = drag; drag = null; suppressClick = d.moved;
   if (d.moved) banner('Fibo corregido · zona con ' + S.touches + ' toques', 2000);
   if (d.resume) S.paused = false;
   refresh();
 });
-cv.addEventListener('pointercancel', () => { if (drag && drag.resume) S.paused = false; drag = null; refresh(); });
+cv.addEventListener('pointercancel', () => { slDrag = false; if (drag && drag.resume) S.paused = false; drag = null; refresh(); });
 cv.addEventListener('click', ev => {
   if (!S || !geo) return;
   if (suppressClick) { suppressClick = false; return; }
   if (S.fibMode === 1) { S.fibTmp = snapBody(ev); S.fibMode = 2; return; }
   if (S.fibMode === 2) { const a = S.fibTmp; S.fibTmp = null; applyFib(a, snapBody(ev)); endFibMode(); return; }
-  if (S.phase === 'slpick' && pending) {
-    S.sl = Math.round(priceAt(ev) * 100) / 100;
-    $('ovSl').textContent = 'SL en ' + fmt(S.sl) + ' (riesgo ' + fmt(Math.abs(pending.price - S.sl)) + ' USD). Otro toque lo mueve.';
-  }
+  if (S.phase === 'slpick' && pending) setSl(priceAt(ev));
 });
 cv.addEventListener('wheel', ev => { ev.preventDefault(); nCandles = Math.max(20, Math.min(400, Math.round(nCandles * (ev.deltaY > 0 ? 1.15 : 0.87)))); }, { passive:false });
 let pinch = null;
@@ -636,14 +658,46 @@ cv.addEventListener('touchmove', ev => { if (pinch && ev.touches.length === 2) {
 cv.addEventListener('touchend', ev => { if (ev.touches.length < 2) pinch = null; });
 function tdist(ev) { const a = ev.touches[0], b = ev.touches[1]; return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY); }
 function startFib() {
-  if (!S || !(S.phase === 'live' || S.phase === 'slpick')) return;
+  if (!S || S.phase !== 'live') return;
   if (S.fibMode) { endFibMode(); return; }
   if (S.phase === 'live' && !S.paused) { S.paused = true; S.resumeAfterFib = true; }
   S.fibMode = 1; refresh();
 }
 
 // ---------- decisiones ----------
-function openSheet(modal) { $('sheet').hidden = false; $('scrim').hidden = !modal; $('ovNote').value = ''; }
+// Ventanas que se pueden arrastrar por su barra y plegar con el boton –.
+function makeMovable(el) {
+  const g = el.querySelector('.grip'), mb = el.querySelector('.minb'); let st = null;
+  g.addEventListener('pointerdown', ev => {
+    if (ev.target.closest('button')) return;
+    const r = el.getBoundingClientRect(); st = { dx:ev.clientX - r.left, dy:ev.clientY - r.top };
+    Object.assign(el.style, { width:r.width + 'px', left:r.left + 'px', top:r.top + 'px', right:'auto', bottom:'auto', borderRadius:'10px' });
+    g.setPointerCapture(ev.pointerId); ev.preventDefault();
+  });
+  g.addEventListener('pointermove', ev => {
+    if (!st) return;
+    const r = el.getBoundingClientRect();
+    const x = Math.min(Math.max(0, ev.clientX - st.dx), Math.max(0, innerWidth - r.width));
+    const y = Math.min(Math.max(0, ev.clientY - st.dy), Math.max(0, innerHeight - 44));
+    el.style.left = x + 'px'; el.style.top = y + 'px'; el.style.maxHeight = (innerHeight - y - 6) + 'px';
+  });
+  const end = () => { st = null; }; g.addEventListener('pointerup', end); g.addEventListener('pointercancel', end);
+  mb.addEventListener('click', () => setMin(el, !el.classList.contains('min')));
+}
+function setMin(el, on) {
+  el.classList.toggle('min', on); const mb = el.querySelector('.minb');
+  mb.textContent = on ? '▢' : '–'; mb.setAttribute('aria-label', on ? 'Desplegar' : 'Plegar');
+}
+['sheet', 'resultBox', 'cfgBox'].forEach(id => makeMovable($(id)));
+// Al girar el telefono o cambiar el tamano de la ventana, cada ventana vuelve a su sitio para no quedar fuera de la pantalla.
+// Solo cuenta el ancho: el teclado del movil cambia el alto y no debe mover la ventana mientras escribes.
+let lastW = innerWidth;
+window.addEventListener('resize', () => {
+  if (innerWidth === lastW) return; lastW = innerWidth;
+  ['sheet', 'resultBox', 'cfgBox'].forEach(id => ['width', 'left', 'top', 'right', 'bottom', 'borderRadius', 'maxHeight'].forEach(p => $(id).style[p] = ''));
+});
+// Sin velo oscuro: el grafico sigue visible y la ventana se puede apartar.
+function openSheet(modal) { $('sheet').hidden = false; $('scrim').hidden = true; setMin($('sheet'), false); $('ovNote').value = ''; }
 function closeSheet() { $('sheet').hidden = true; $('scrim').hidden = true; }
 function decide(kind, auto) {
   if (!S || S.phase !== 'live' || S.idx === 0) return;
@@ -670,7 +724,7 @@ async function save(withSl) {
   const rec = { id:ep.id, decision:d.kind, auto:d.auto, tf:ep.tf, lado:ep.side, tick_idx:i, t_ms:S.t[i],
     tick_ms_utc:ep.m_start * 60000 + S.t[i], bid:usd(S.b[i]), ask:usd(S.a[i]),
     precio_entrada:d.kind === 'entro' ? d.price : null, sl:S.sl, nota:$('ovNote').value.trim(),
-    fib:{ f1:ep.f1, f0:ep.f0 }, fib_original:S.fibFix ? true : false, fib_corregido:S.fibFix,
+    fib:{ f1:ep.f1, f0:ep.f0 }, fib_original:!S.fibFix, fib_corregido:S.fibFix,
     zona:{ lo:S.zLo, hi:S.zHi, toques:S.touches },
     velocidad:speed, pausas:S.pauses, cambios_velocidad:S.speedChanges, rapido_usado:S.ffUsed,
     vista:TFS.find(x => x[1] === viewTf)[0], velas_visibles:nCandles,
@@ -705,7 +759,7 @@ function showResult() {
   txt += 'A favor como máximo: ' + fmt(mfe) + ' USD\nEn contra como máximo: ' + fmt(mae) + ' USD\n';
   txt += 'Llegó al Fib 0,50 (TP): ' + when(tpAt) + '\nRompió Fib 1 por más de 2 USD: ' + when(brokeAt);
   if (S.sl != null) txt += '\nTu SL (' + fmt(S.sl) + '): ' + when(slAt) + '\nPrimero llegó: ' + (tpAt >= 0 && (slAt < 0 || tpAt < slAt) ? 'TP' : slAt >= 0 ? 'SL' : 'ninguno');
-  $('result').textContent = txt; $('resultBox').hidden = false;
+  $('result').textContent = txt; setMin($('resultBox'), false); $('resultBox').hidden = false;
 }
 function updateExport() {
   const b = $('bExport'); b.hidden = store.kind !== 'device';
