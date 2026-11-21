@@ -1,0 +1,594 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0e1116">
+<meta name="description" content="Practica entradas en la golden zone del oro con ticks reales, como en directo.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="iconos/icono-192.png">
+<link rel="apple-touch-icon" href="iconos/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Simulador">
+</head>
+<body>
+<title>Simulador de Reacción</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@500;600&display=swap">
+<style>
+  /* Una pantalla de trabajo: grafico arriba (o a la izquierda en escritorio), mandos abajo (o a la derecha). Aspecto de terminal de trading, solo oscuro. */
+  :root {
+    --bg:#0e1116; --panel:#151a21; --raise:#1d242d; --line:#28303b; --text:#e4e8ee; --muted:#8a94a4;
+    --up:#22a495; --down:#e5534b; --gold:#d6a630; --tp:#5b9cf5;
+    --sans:'Inter',system-ui,'Segoe UI',sans-serif; --mono:'JetBrains Mono',ui-monospace,Consolas,monospace;
+    color-scheme:dark;
+  }
+  [hidden] { display:none !important; }
+  * { box-sizing:border-box; }
+  html, body { height:100%; margin:0; }
+  body { background:var(--bg); color:var(--text); font:14px/1.4 var(--sans); overflow:hidden; }
+  .app { height:100%; display:flex; flex-direction:column; }
+  .top { display:flex; gap:6px; align-items:center; flex-wrap:wrap; padding-block:8px;
+         padding-left:max(16px, env(safe-area-inset-left, 0px)); padding-right:max(16px, env(safe-area-inset-right, 0px));
+         border-bottom:1px solid var(--line); background:var(--panel); }
+  .top h1 { font-size:14px; margin:0 6px 0 0; font-weight:700; letter-spacing:.01em; }
+  .pill { padding:2px 9px; border-radius:999px; border:1px solid var(--line); color:var(--muted); white-space:nowrap; font-size:12px; }
+  .pill b { color:var(--text); font-weight:600; }
+  .buy { color:var(--up) !important; } .sell { color:var(--down) !important; }
+  .stage { flex:1; min-height:0; display:grid; grid-template-columns:1fr 300px; }
+  #chartWrap { position:relative; min-height:0; }
+  canvas { position:absolute; inset:0; width:100%; height:100%; display:block; touch-action:none; }
+  #banner { position:absolute; top:10px; left:50%; transform:translateX(-50%); background:var(--gold); color:#111; padding:5px 12px; border-radius:6px; font-weight:600; font-size:13px; z-index:2; max-width:90%; text-align:center; }
+  #pausedTag { position:absolute; top:10px; left:max(10px, env(safe-area-inset-left, 0px)); background:var(--down); color:#fff; padding:2px 9px; border-radius:5px; font-weight:700; font-size:12px; z-index:2; }
+  .panel { border-left:1px solid var(--line); background:var(--panel); display:flex; flex-direction:column; gap:12px; overflow:auto;
+           padding-block:12px; padding-left:14px; padding-right:max(14px, env(safe-area-inset-right, 0px)); }
+  .row { display:flex; gap:6px; flex-wrap:wrap; }
+  .seg { display:grid; grid-auto-flow:column; grid-auto-columns:1fr; gap:4px; }
+  button { font:inherit; color:var(--text); background:var(--raise); border:1px solid var(--line); border-radius:7px; padding:7px 8px; cursor:pointer; user-select:none; -webkit-user-select:none; touch-action:manipulation; }
+  button:hover:not(:disabled) { border-color:#4d5868; }
+  button:focus-visible { outline:2px solid var(--tp); outline-offset:1px; }
+  button:disabled { opacity:.38; cursor:default; }
+  button.on { background:#33425a; border-color:#7389a8; }
+  .big { padding:13px 8px; font-size:15px; font-weight:700; }
+  #bEntro.buyc { background:#17463f; border-color:var(--up); }
+  #bEntro.sellc { background:#55211f; border-color:var(--down); }
+  .act2 { display:grid; grid-template-columns:1fr; gap:8px; }
+  .lbl { color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.06em; margin-bottom:4px; }
+  .quote { display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; }
+  #price { font:600 22px var(--mono); font-variant-numeric:tabular-nums; }
+  #clock { font:12px var(--mono); color:var(--muted); font-variant-numeric:tabular-nums; }
+  kbd { font:10px var(--mono); color:var(--muted); border:1px solid var(--line); border-radius:4px; padding:0 4px; margin-left:4px; }
+  #result { white-space:pre-line; font-size:13px; }
+  .help { color:var(--muted); font-size:12px; margin-top:auto; }
+  .help summary { cursor:pointer; }
+  .sheet { position:fixed; z-index:5; left:16px; top:56px; width:min(420px, calc(100% - 32px)); background:var(--panel); border:1px solid var(--line); border-radius:10px;
+           padding:14px; display:flex; flex-direction:column; gap:10px; box-shadow:0 10px 30px #000a; }
+  .scrim { position:fixed; inset:0; background:#0009; z-index:4; }
+  .sheet h2 { margin:0; font-size:16px; }
+  textarea { width:100%; min-height:60px; background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:6px; padding:8px; font:inherit; resize:vertical; }
+  .muted { color:var(--muted); }
+  @media (hover:none) { kbd { display:none; } }
+  @media (max-width:899px) {
+    .stage { grid-template-columns:1fr; grid-template-rows:minmax(0,1fr) auto; }
+    .panel { border-left:0; border-top:1px solid var(--line); gap:8px; overflow:visible;
+             padding-left:max(12px, env(safe-area-inset-left, 0px)); padding-right:max(12px, env(safe-area-inset-right, 0px)); padding-block:8px; }
+    .lbl { display:none; }
+    .act2 { grid-template-columns:1fr 1fr; }
+    .big { padding:12px 6px; font-size:14px; }
+    .help { display:none; }
+    .top h1 { display:none; }
+    .sheet { left:0; right:0; top:auto; bottom:0; width:auto; border-radius:12px 12px 0 0;
+             padding-left:max(16px, env(safe-area-inset-left, 0px)); padding-right:max(16px, env(safe-area-inset-right, 0px));
+             padding-bottom:max(14px, env(safe-area-inset-bottom, 0px)); }
+  }
+</style>
+
+<div class="app">
+  <header class="top">
+    <h1>Simulador de Reacción · XAUUSD</h1>
+    <span class="pill" id="pEp">Cargando…</span>
+    <span class="pill">Estructura <b id="pTf">–</b></span>
+    <span class="pill"><b id="pSide">–</b></span>
+    <span class="pill">Tramo <b id="pLeg">–</b></span>
+    <span class="pill" id="pDone">Hechos 0</span>
+  </header>
+  <div class="stage">
+    <div id="chartWrap"><canvas id="cv"></canvas><div id="banner" hidden></div><div id="pausedTag" hidden>EN PAUSA</div></div>
+    <aside class="panel">
+      <div class="quote"><span id="price">–</span><span id="clock">–</span></div>
+      <div><div class="lbl">Velas</div><div class="seg" id="tfRow"></div></div>
+      <div><div class="lbl">Velocidad</div><div class="seg" id="spRow"></div></div>
+      <div class="seg">
+        <button id="bPause" data-act="pause">⏸ Pausa<kbd>Espacio</kbd></button>
+        <button id="bFF" data-act="ff">⏩ Hasta la zona<kbd>F</kbd></button>
+      </div>
+      <div class="act2">
+        <button class="big" id="bEntro" data-act="entro">ENTRO</button>
+        <button class="big" id="bNo" data-act="no_entro">NO ENTRO<kbd>N</kbd></button>
+      </div>
+      <div class="seg">
+        <button id="bFib" data-act="fib">Corregir Fibo<kbd>C</kbd></button>
+        <button id="bOrig" data-act="orig">Fibo original</button>
+        <button id="bSkip" data-act="skip">Saltar<kbd>S</kbd></button>
+      </div>
+      <div id="resultBox" hidden>
+        <div class="lbl">Qué pasó después</div>
+        <div id="result"></div>
+        <button class="big" id="bNext" data-act="next" style="width:100%;margin-top:8px">Siguiente caso<kbd>→</kbd></button>
+      </div>
+      <button id="bExport" hidden>Exportar mis decisiones</button>
+      <details class="help" open>
+        <summary>Cómo usarlo</summary>
+        <p>Fibonacci de la estructura externa, de cuerpo a cuerpo: del cuerpo más bajo al más alto del tramo (los dos puntos).
+        La franja dorada intensa es la zona con más toques dentro de 0,78–1, de 1,70 USD como máximo.
+        Pulsa ENTRO en el instante en que entrarías en directo.</p>
+        <p>Si el Fibo está mal, arrastra la línea 1 o la 0 hasta el cuerpo correcto, o pulsa Corregir Fibo y toca el nivel 1 y luego el 0. Siempre se ajusta al cuerpo de la vela más cercana.
+        Zoom: rueda del ratón o dos dedos. Horas en UTC; la fecha va oculta.</p>
+      </details>
+    </aside>
+  </div>
+</div>
+<div class="scrim" id="scrim" hidden></div>
+<div class="sheet" id="sheet" hidden>
+  <h2 id="ovTitle"></h2>
+  <div id="ovSl" class="muted"></div>
+  <textarea id="ovNote" placeholder="¿Qué viste en la vela para decidir? (opcional, pero muy útil)"></textarea>
+  <div class="row"><button id="ovSave" class="on">Guardar</button><button id="ovNoSl">Guardar sin SL</button><button id="ovCancel">Cancelar</button></div>
+</div>
+
+<script>
+'use strict';
+const TFS = [['M1',1],['M5',5],['M15',15],['H1',60],['H4',240]];
+const SPEEDS = [0.5,1,2,5,10];
+const STRIP = 1.70, TOUCH_BACK_BARS = 10;
+const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+const $ = id => document.getElementById(id);
+let order = [], done = new Set(), pos = 0, ep = null, S = null, geo = null, pending = null, busy = false;
+let viewTf = 5, nCandles = 120, speed = 1;
+const usd = c => (ep.base + c) / 100;
+const fmt = v => v.toFixed(2);
+
+// ---------- guardado: nube (claude.ai), servidor local o, si no hay ninguno, nada ----------
+const store = { kind:'none', db:null };
+async function initStore() {
+  if (window.claude && typeof window.claude.use === 'function') {
+    try { const db = await window.claude.use('db'); if (db) { store.kind = 'db'; store.db = db; return; } } catch (e) {}
+  }
+  try { const r = await fetch('api/hechos'); if (r.ok && (r.headers.get('content-type') || '').includes('json')) { store.kind = 'local'; return; } } catch (e) {}
+  try { localStorage.setItem('sim_prueba', '1'); localStorage.removeItem('sim_prueba'); store.kind = 'device'; } catch (e) {}
+}
+// App publica: las decisiones se guardan en el propio telefono y se exportan con el boton.
+const DKEY = 'sim_decisiones_v2';
+function deviceAll() { try { return JSON.parse(localStorage.getItem(DKEY) || '{}'); } catch (e) { return {}; } }
+async function exportDecisions() {
+  const all = deviceAll(), n = Object.keys(all).length;
+  if (!n) { banner('Todavía no hay decisiones que exportar', 2500); return; }
+  const name = 'decisiones_simulador_' + new Date().toISOString().slice(0, 10) + '.json';
+  const blob = new Blob([JSON.stringify(Object.values(all), null, 1)], { type:'application/json' });
+  try {
+    const file = new File([blob], name, { type:'application/json' });
+    if (navigator.canShare && navigator.canShare({ files:[file] })) { await navigator.share({ files:[file], title:'Decisiones del simulador' }); return; }
+  } catch (e) { if (e && e.name === 'AbortError') return; }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+async function loadDone() {
+  try {
+    if (store.kind === 'db') {
+      const snap = await Promise.race([store.db.collection('decisiones').get(), new Promise((_, rej) => setTimeout(() => rej(new Error('tiempo')), 10000))]);
+      return snap.docs.map(d => d.id);
+    }
+    if (store.kind === 'local') return await (await fetch('api/hechos')).json();
+    if (store.kind === 'device') return Object.keys(deviceAll());
+  } catch (e) { banner('No pude leer las decisiones guardadas: ' + e.message, 4000); }
+  return [];
+}
+async function saveRecord(rec) {
+  if (store.kind === 'db') return store.db.collection('decisiones').doc(rec.id).set(rec);
+  if (store.kind === 'local') {
+    const r = await fetch('api/decision', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify(rec) });
+    if (!r.ok) throw new Error('HTTP ' + r.status); return;
+  }
+  if (store.kind === 'device') { const all = deviceAll(); all[rec.id] = rec; localStorage.setItem(DKEY, JSON.stringify(all)); updateExport(); return; }
+  throw new Error('esta página no tiene dónde guardar');
+}
+
+// ---------- controles ----------
+function mkBtn(text, fn) { const b = document.createElement('button'); b.textContent = text; b.addEventListener('click', fn); return b; }
+TFS.forEach(([n, m]) => { const b = mkBtn(n, () => setView(m, true)); b.dataset.tf = m; $('tfRow').appendChild(b); });
+SPEEDS.forEach(s => { const b = mkBtn(s + '×', () => setSpeed(s)); b.dataset.sp = s; $('spRow').appendChild(b); });
+// Ningun boton conserva el foco tras un clic: asi Espacio o Enter no lo vuelven a pulsar.
+document.addEventListener('pointerup', () => { const a = document.activeElement; if (a && a.tagName === 'BUTTON') a.blur(); });
+
+function setView(m) { viewTf = m; refresh(); }
+function setSpeed(s) { speed = s; if (S) { S.ff = false; S.speedChanges++; } refresh(); }
+function refresh() {
+  document.querySelectorAll('#tfRow button').forEach(b => b.classList.toggle('on', +b.dataset.tf === viewTf));
+  document.querySelectorAll('#spRow button').forEach(b => b.classList.toggle('on', !!S && !S.ff && +b.dataset.sp === speed));
+  if (!S) return;
+  const live = S.phase === 'live', canPause = live || S.phase === 'reveal';
+  $('bPause').disabled = !canPause;
+  $('bPause').firstChild.textContent = S.paused ? '▶ Seguir' : '⏸ Pausa';
+  $('bPause').classList.toggle('on', S.paused);
+  $('pausedTag').hidden = !(S.paused && canPause && !S.fibMode);
+  $('bFF').disabled = !live; $('bFF').classList.toggle('on', S.ff);
+  ['bEntro','bNo','bSkip'].forEach(k => $(k).disabled = !live);
+  $('bFib').disabled = !(live || S.phase === 'slpick');
+  $('bFib').classList.toggle('on', !!S.fibMode);
+  $('bOrig').disabled = !(S.fibFix && (live || S.phase === 'slpick'));
+}
+function togglePause() {
+  if (!S || !(S.phase === 'live' || S.phase === 'reveal')) return;
+  S.paused = !S.paused; if (S.paused && S.phase === 'live') S.pauses++;
+  S.last = performance.now(); refresh();
+}
+function toggleFF() { if (!S || S.phase !== 'live') return; S.ff = !S.ff; if (S.ff) { S.ffUsed = true; S.paused = false; } refresh(); }
+let bannerTimer = 0;
+function banner(text, ms) { const b = $('banner'); b.textContent = text; b.hidden = false; clearTimeout(bannerTimer); if (ms) bannerTimer = setTimeout(() => b.hidden = true, ms); }
+
+// ---------- carga ----------
+async function start() {
+  refresh(); banner('Cargando casos…');
+  const [idx] = await Promise.all([fetch('casos/indice.json').then(r => r.json()), initStore()]);
+  order = idx; done = new Set(await loadDone());
+  if (store.kind === 'none') banner('Aviso: aquí no se guardan las decisiones.', 5000);
+  updateExport();
+  pos = order.findIndex(o => !done.has(o.id)); if (pos < 0) pos = 0;
+  await load(pos);
+  requestAnimationFrame(loop);
+}
+async function load(p) {
+  if (busy) return; busy = true;
+  try {
+    pos = p; banner('Cargando caso…');
+    ep = await (await fetch('casos/' + order[pos].id + '.json')).json();
+    const n = ep.dt.length, t = new Float64Array(n), b = new Int32Array(n), a = new Int32Array(n);
+    let ct = 0, cb = 0, si = 0, sp = ep.spc.length ? ep.spc[0][1] : 0;
+    for (let i = 0; i < n; i++) {
+      ct += ep.dt[i]; cb += ep.db[i];
+      while (si < ep.spc.length && ep.spc[si][0] === i) { sp = ep.spc[si][1]; si++; }
+      t[i] = ct; b[i] = cb; a[i] = cb + sp;
+    }
+    S = { t, b, a, n, idx:0, clock:0, m1:ep.hist.map(c => ({ m:c[0], o:c[1], h:c[2], l:c[3], c:c[4] })),
+          paused:false, ff:false, pauses:0, speedChanges:0, ffUsed:false, phase:'live', firstTouch:-1, firstZone:-1,
+          decision:null, sl:null, fibMode:0, fibFix:null, wallStart:performance.now(), last:performance.now(), warned:false };
+    ep.orig = { f1:ep.f1, f0:ep.f0, zlo:ep.zona_lo, zhi:ep.zona_hi, t:ep.toques };
+    setFib(ep.f1, ep.f0, ep.zona_lo, ep.zona_hi, ep.toques);
+    viewTf = ep.tf_min; nCandles = Math.max(40, Math.min(300, Math.ceil(-ep.a1 / ep.tf_min) + 16));
+    speed = 1; $('banner').hidden = true;
+    $('pEp').innerHTML = 'Caso <b>' + (pos + 1) + '</b>/' + order.length;
+    $('pTf').textContent = ep.tf;
+    $('pSide').textContent = ep.side > 0 ? 'COMPRA' : 'VENTA';
+    $('pSide').className = ep.side > 0 ? 'buy' : 'sell';
+    $('pDone').textContent = 'Hechos ' + done.size;
+    $('bEntro').className = 'big ' + (ep.side > 0 ? 'buyc' : 'sellc');
+    $('bEntro').innerHTML = (ep.side > 0 ? 'ENTRO · COMPRA' : 'ENTRO · VENTA') + '<kbd>E</kbd>';
+    $('resultBox').hidden = true;
+    refresh();
+  } catch (e) { banner('No se pudo cargar el caso: ' + e.message); }
+  busy = false;
+}
+function setFib(f1, f0, zlo, zhi, touches) {
+  ep.f1 = f1; ep.f0 = f0;
+  const L = x => f0 + x * (f1 - f0);            // nivel x: 0 en f0, 1 en f1
+  ep.lv = { '1':L(1), '0,78':L(0.78), '0,618':L(0.618), '0,50':L(0.5), '0':L(0) };
+  ep.edge78 = L(0.78); ep.fib50 = L(0.5);
+  S.lo = Math.min(ep.edge78, f1); S.hi = Math.max(ep.edge78, f1); S.far = Math.max(4, 0.8 * (S.hi - S.lo));
+  S.zLo = zlo; S.zHi = zhi; S.touches = touches;
+  $('pLeg').textContent = fmt(Math.abs(f0 - f1)) + ' USD' + (S.fibFix ? ' (corregido)' : '');
+}
+// Misma regla que preparar_casos.py: franja de 1,70 USD dentro de 0,78-1 con mas minimos (compra) o maximos (venta) de las velas de la estructura.
+function bestStrip(bars, side, lo, hi, f1) {
+  const ext = bars.map(c => side > 0 ? usd(c.l) : usd(c.h)).filter(e => e >= lo - 1e-9 && e <= hi + 1e-9);
+  if (hi - lo <= STRIP) return [lo, hi, ext.length];
+  let best = null;
+  for (const e of ext) for (let s of [e, e - STRIP]) {
+    s = Math.min(Math.max(s, lo), hi - STRIP); const t = s + STRIP;
+    const n = ext.filter(x => x >= s - 1e-9 && x <= t + 1e-9).length, d = Math.abs((s + t) / 2 - f1);
+    if (!best || n > best[2] || (n === best[2] && d < best[3])) best = [s, t, n, d];
+  }
+  return best ? best.slice(0, 3) : [lo, lo + STRIP, 0];
+}
+function distUsd(p) { return p < S.lo ? S.lo - p : p > S.hi ? p - S.hi : 0; }
+
+// ---------- reproduccion ----------
+function pushTick(i) {
+  const m = Math.floor(S.t[i] / 60000), p = S.b[i], arr = S.m1, last = arr[arr.length - 1];
+  if (last && last.m === m) { if (p > last.h) last.h = p; if (p < last.l) last.l = p; last.c = p; }
+  else arr.push({ m, o:p, h:p, l:p, c:p });
+  const u = usd(p);
+  if (S.firstTouch < 0 && u >= S.lo - 1e-9 && u <= S.hi + 1e-9) S.firstTouch = i;
+  if (S.firstZone < 0 && u >= S.zLo - 1e-9 && u <= S.zHi + 1e-9) S.firstZone = i;
+}
+function loop(now) {
+  if (S && !busy) {
+    const dtw = Math.min(now - S.last, 250); S.last = now;
+    if (!S.paused && (S.phase === 'live' || S.phase === 'reveal') && S.idx < S.n) {
+      S.clock += dtw * (S.phase === 'reveal' ? 120 : S.ff ? 40 : speed);
+      if (S.t[S.idx] - S.clock > 90000) S.clock = S.t[S.idx];        // saltar huecos sin cotizacion
+      while (S.idx < S.n && S.t[S.idx] <= S.clock) { pushTick(S.idx); S.idx++; }
+      if (S.phase === 'live' && S.idx > 0 && !S.warned && distUsd(usd(S.b[S.idx - 1])) <= S.far) {
+        S.warned = true; if (S.ff) { S.ff = false; speed = 1; } banner('Precio cerca de la zona · ' + speed + '×', 2000); refresh();
+      }
+      if (S.idx >= S.n) onEnd();
+    }
+    draw(); side();
+  }
+  requestAnimationFrame(loop);
+}
+function onEnd() {
+  if (S.phase === 'live') decide('sin_decision', true);
+  else if (S.phase === 'reveal') { S.phase = 'done'; showResult(); refresh(); }
+}
+
+// ---------- grafico ----------
+function aggregate(n, count) {
+  const src = S.m1, off = ep.utc_minute_of_day, out = [];
+  let from = 0;
+  if (count) { const need = count * n + n; from = Math.max(0, src.length - need); }
+  for (let i = from; i < src.length; i++) {
+    const c = src[i], k = Math.floor((c.m + off) / n), last = out[out.length - 1];
+    if (last && last.k === k) { if (c.h > last.h) last.h = c.h; if (c.l < last.l) last.l = c.l; last.c = c.c; }
+    else out.push({ k, o:c.o, h:c.h, l:c.l, c:c.c });
+  }
+  return count ? out.slice(-count) : out;
+}
+function draw() {
+  const dpr = window.devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight;
+  if (!W || !H) return;
+  if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.fillStyle = '#0e1116'; ctx.fillRect(0, 0, W, H);
+  const cs = aggregate(viewTf, nCandles); if (!cs.length) return;
+  const small = W < 500, padR = small ? 64 : 92, padB = 20, pw = W - padR, ph = H - padB, cw = pw / nCandles, off = ep.utc_minute_of_day;
+  let lo = Infinity, hi = -Infinity;
+  cs.forEach(c => { lo = Math.min(lo, usd(c.l)); hi = Math.max(hi, usd(c.h)); });
+  [S.lo, S.hi, ep.fib50].forEach(v => { lo = Math.min(lo, v); hi = Math.max(hi, v); });
+  if (S.sl != null) { lo = Math.min(lo, S.sl); hi = Math.max(hi, S.sl); }
+  const pad = (hi - lo) * 0.06 || 1; lo -= pad; hi += pad;
+  const y = v => ph - (v - lo) / (hi - lo) * ph;
+  const xOfMin = m => { if (m == null) return null; const i = Math.floor((m + off) / viewTf) - cs[0].k; return (i >= 0 && i < cs.length) ? i * cw + cw / 2 : null; };
+  geo = { lo, hi, ph, pw, cw, cs };
+  ctx.font = (small ? 10 : 11) + 'px ' + 'JetBrains Mono, monospace'; ctx.lineWidth = 1;
+  const step = niceStep((hi - lo) / (small ? 6 : 8));
+  for (let v = Math.ceil(lo / step) * step; v < hi; v += step) {
+    const yy = Math.round(y(v)) + .5; ctx.strokeStyle = '#1a2028'; ctx.beginPath(); ctx.moveTo(0, yy); ctx.lineTo(pw, yy); ctx.stroke();
+    ctx.fillStyle = '#5b6576'; ctx.fillText(fmt(v), pw + 5, yy + 4);
+  }
+  ctx.fillStyle = '#d6a6301a'; ctx.fillRect(0, y(S.hi), pw, y(S.lo) - y(S.hi));                     // zona 0,78-1
+  ctx.fillStyle = '#d6a63055'; ctx.fillRect(0, y(S.zHi), pw, Math.max(2, y(S.zLo) - y(S.zHi)));      // franja de maximo toque
+  ctx.fillStyle = '#d6a630'; const zl = 'Zona · ' + S.touches + ' toques'; ctx.fillText(zl, 6, y(S.zHi) - 4);
+  const style = { '1':['#d6a630',[]], '0,78':['#d6a630',[4,4]], '0,618':['#a3853a',[2,4]], '0,50':['#5b9cf5',[6,4]], '0':['#8a94a4',[]] };
+  for (const k in ep.lv) { const v = ep.lv[k]; if (v > lo && v < hi) hline(v, style[k][0], (k === '0,50' ? '0,50 TP' : k) + ' ' + fmt(v), y, pw, style[k][1]); }
+  const x1 = xOfMin(S.fibFix ? S.fibFix.m1 : ep.a1), x0 = xOfMin(S.fibFix ? S.fibFix.m0 : ep.a0);
+  if (x1 != null && x0 != null) { ctx.setLineDash([3, 3]); ctx.strokeStyle = '#d6a63099'; ctx.beginPath(); ctx.moveTo(x1, y(ep.f1)); ctx.lineTo(x0, y(ep.f0)); ctx.stroke(); ctx.setLineDash([]); }
+  const bw = Math.max(1, cw * 0.7);
+  cs.forEach((c, i) => {
+    const x = i * cw + cw / 2; ctx.strokeStyle = ctx.fillStyle = c.c >= c.o ? '#22a495' : '#e5534b';
+    ctx.beginPath(); ctx.moveTo(Math.round(x) + .5, y(usd(c.h))); ctx.lineTo(Math.round(x) + .5, y(usd(c.l))); ctx.stroke();
+    const yo = y(usd(c.o)), yc = y(usd(c.c)); ctx.fillRect(x - bw / 2, Math.min(yo, yc), bw, Math.max(1, Math.abs(yc - yo)));
+  });
+  if (x1 != null) dot(x1, y(ep.f1), '#d6a630', '1'); if (x0 != null) dot(x0, y(ep.f0), '#8a94a4', '0');
+  ctx.fillStyle = '#5b6576'; const every = Math.max(1, Math.round(nCandles / (small ? 4 : 8)));
+  cs.forEach((c, i) => { if ((cs.length - 1 - i) % every === 0) { const md = ((c.k * viewTf) % 1440 + 1440) % 1440; ctx.fillText(hhmm(md), i * cw, H - 5); } });
+  if (S.idx > 0) {
+    const p = usd(S.b[S.idx - 1]), yy = y(p);
+    ctx.setLineDash([3, 3]); ctx.strokeStyle = '#c9ced6'; ctx.beginPath(); ctx.moveTo(0, yy); ctx.lineTo(pw, yy); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = '#c9ced6'; ctx.fillRect(pw, yy - 9, padR, 18); ctx.fillStyle = '#111'; ctx.fillText(fmt(p), pw + 5, yy + 4);
+  }
+  if (S.decision && S.decision.kind === 'entro') hline(S.decision.price, '#ffffff', 'Entrada ' + fmt(S.decision.price), y, pw, []);
+  if (S.sl != null) hline(S.sl, '#e5534b', 'SL ' + fmt(S.sl), y, pw, [5, 3]);
+  if (S.fibTmp) { const xt = xOfMin(S.fibTmp.minute); ctx.strokeStyle = '#d6a630'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(xt == null ? 12 : xt, y(S.fibTmp.price), 9, 0, 7); ctx.stroke(); ctx.lineWidth = 1; }
+  if (S.fibMode) { ctx.fillStyle = '#d6a630'; ctx.font = '600 13px Inter, system-ui'; ctx.fillText(S.fibMode === 1 ? 'Toca el cuerpo de vela del nivel 1 (' + (ep.side > 0 ? 'mínimo' : 'máximo') + ' del tramo)' : 'Ahora toca el cuerpo del nivel 0 (' + (ep.side > 0 ? 'máximo' : 'mínimo') + ')', 10, 34); }
+}
+function hline(v, col, label, y, pw, dash) {
+  const yy = Math.round(y(v)) + .5; ctx.setLineDash(dash); ctx.strokeStyle = col; ctx.beginPath(); ctx.moveTo(0, yy); ctx.lineTo(pw, yy); ctx.stroke(); ctx.setLineDash([]);
+  ctx.fillStyle = col; ctx.fillText(label, Math.max(4, pw - ctx.measureText(label).width - 6), yy - 4);
+}
+function dot(x, yy, col, label) { ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x, yy, 6, 0, 7); ctx.fill(); ctx.fillStyle = '#111'; const f = ctx.font; ctx.font = '700 9px Inter, system-ui'; ctx.fillText(label, x - 3, yy + 3); ctx.font = f; }
+function niceStep(r) { const p = Math.pow(10, Math.floor(Math.log10(r))), f = r / p; return (f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10) * p; }
+function hhmm(md) { return String(Math.floor(md / 60)).padStart(2, '0') + ':' + String(md % 60).padStart(2, '0'); }
+function side() {
+  if (!S.idx) { $('price').textContent = '–'; return; }
+  const i = S.idx - 1; $('price').textContent = fmt(usd(S.b[i]));
+  const d = Math.floor((ep.utc_minute_of_day * 60000 + S.t[i]) / 1000) % 86400;
+  $('clock').textContent = hhmm(Math.floor(d / 60)) + ':' + String(d % 60).padStart(2, '0') + ' UTC · spread ' + fmt((S.a[i] - S.b[i]) / 100);
+}
+
+// ---------- toques en el grafico: SL y correccion del Fibo ----------
+function priceAt(ev) { const r = cv.getBoundingClientRect(); return geo.lo + (geo.ph - (ev.clientY - r.top)) / geo.ph * (geo.hi - geo.lo); }
+function snapBody(ev) {
+  const r = cv.getBoundingClientRect(), x = ev.clientX - r.left, p = priceAt(ev), ci = Math.floor(x / geo.cw);
+  let best = null;
+  for (let i = Math.max(0, ci - 2); i <= Math.min(geo.cs.length - 1, ci + 2); i++) {
+    const c = geo.cs[i];
+    for (const v of [usd(Math.max(c.o, c.c)), usd(Math.min(c.o, c.c))]) if (!best || Math.abs(v - p) < Math.abs(best.v - p)) best = { v, k:c.k };
+  }
+  return best ? { price:best.v, minute:best.k * viewTf - ep.utc_minute_of_day } : { price:Math.round(p * 100) / 100, minute:null };
+}
+// Aplica un Fibo nuevo (a = nivel 1, z = nivel 0) y recalcula la franja de maximo toque.
+function applyFib(a, z, quiet) {
+  if (Math.abs(a.price - z.price) < 1) { banner('Los dos puntos están demasiado juntos', 2000); return; }
+  if (ep.side * (z.price - a.price) <= 0) { banner(ep.side > 0 ? 'En compra el nivel 1 va abajo y el 0 arriba' : 'En venta el nivel 1 va arriba y el 0 abajo', 2500); return; }
+  S.fibFix = { f1:a.price, f0:z.price, m1:a.minute, m0:z.minute };
+  const e = z.price + 0.78 * (a.price - z.price), lo = Math.min(e, a.price), hi = Math.max(e, a.price);
+  const from = a.minute == null ? -Infinity : a.minute - TOUCH_BACK_BARS * ep.tf_min;
+  const tfb = aggregate(ep.tf_min).filter(c => c.k * ep.tf_min - ep.utc_minute_of_day >= from);
+  const [zlo, zhi, n] = bestStrip(tfb, ep.side, lo, hi, a.price);
+  setFib(a.price, z.price, zlo, zhi, n); S.firstTouch = -1; S.firstZone = -1; S.warned = false;
+  if (!quiet) banner('Fibo corregido · zona con ' + n + ' toques', 2500);
+}
+function anchors() {
+  const f = S.fibFix;
+  return { a:{ price:ep.f1, minute:f ? f.m1 : ep.a1 }, z:{ price:ep.f0, minute:f ? f.m0 : ep.a0 } };
+}
+function endFibMode() { S.fibMode = 0; S.fibTmp = null; if (S.resumeAfterFib) { S.paused = false; S.resumeAfterFib = false; } refresh(); }
+function restoreFib() {
+  if (!S || !S.fibFix) return;
+  S.fibFix = null; setFib(ep.orig.f1, ep.orig.f0, ep.orig.zlo, ep.orig.zhi, ep.orig.t);
+  S.firstTouch = -1; S.firstZone = -1; S.warned = false; banner('Fibo original', 1500); refresh();
+}
+// Arrastre de las lineas 1 y 0: se pulsa cerca de una de ellas y se mueve; al soltar se ajusta al cuerpo mas cercano.
+let drag = null, suppressClick = false;
+cv.addEventListener('pointerdown', ev => {
+  if (!S || !geo || pinch || !(S.phase === 'live' || S.phase === 'slpick')) return;
+  const r = cv.getBoundingClientRect(), yy = ev.clientY - r.top, Y = v => geo.ph - (v - geo.lo) / (geo.hi - geo.lo) * geo.ph;
+  const d1 = Math.abs(yy - Y(ep.f1)), d0 = Math.abs(yy - Y(ep.f0)), tol = ev.pointerType === 'touch' ? 22 : 10;
+  if (S.fibMode || Math.min(d1, d0) > tol || ev.clientX - r.left > geo.pw) return;
+  drag = { which:d1 <= d0 ? 1 : 0, resume:S.phase === 'live' && !S.paused, moved:false };
+  if (drag.resume) S.paused = true;
+  cv.setPointerCapture(ev.pointerId); ev.preventDefault(); refresh();
+});
+cv.addEventListener('pointermove', ev => {
+  if (!drag) return;
+  drag.moved = true;
+  const p = snapBody(ev), cur = anchors();
+  if (drag.which === 1) applyFib(p, cur.z, true); else applyFib(cur.a, p, true);
+});
+cv.addEventListener('pointerup', ev => {
+  if (!drag) return;
+  const d = drag; drag = null; suppressClick = d.moved;
+  if (d.moved) banner('Fibo corregido · zona con ' + S.touches + ' toques', 2000);
+  if (d.resume) S.paused = false;
+  refresh();
+});
+cv.addEventListener('pointercancel', () => { if (drag && drag.resume) S.paused = false; drag = null; refresh(); });
+cv.addEventListener('click', ev => {
+  if (!S || !geo) return;
+  if (suppressClick) { suppressClick = false; return; }
+  if (S.fibMode === 1) { S.fibTmp = snapBody(ev); S.fibMode = 2; return; }
+  if (S.fibMode === 2) { const a = S.fibTmp; S.fibTmp = null; applyFib(a, snapBody(ev)); endFibMode(); return; }
+  if (S.phase === 'slpick' && pending) {
+    S.sl = Math.round(priceAt(ev) * 100) / 100;
+    $('ovSl').textContent = 'SL en ' + fmt(S.sl) + ' (riesgo ' + fmt(Math.abs(pending.price - S.sl)) + ' USD). Otro toque lo mueve.';
+  }
+});
+cv.addEventListener('wheel', ev => { ev.preventDefault(); nCandles = Math.max(20, Math.min(400, Math.round(nCandles * (ev.deltaY > 0 ? 1.15 : 0.87)))); }, { passive:false });
+let pinch = null;
+cv.addEventListener('touchstart', ev => { if (ev.touches.length === 2) pinch = { d:tdist(ev), n:nCandles }; }, { passive:true });
+cv.addEventListener('touchmove', ev => { if (pinch && ev.touches.length === 2) { nCandles = Math.max(20, Math.min(400, Math.round(pinch.n * pinch.d / Math.max(20, tdist(ev))))); } }, { passive:true });
+cv.addEventListener('touchend', ev => { if (ev.touches.length < 2) pinch = null; });
+function tdist(ev) { const a = ev.touches[0], b = ev.touches[1]; return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY); }
+function startFib() {
+  if (!S || !(S.phase === 'live' || S.phase === 'slpick')) return;
+  if (S.fibMode) { endFibMode(); return; }
+  if (S.phase === 'live' && !S.paused) { S.paused = true; S.resumeAfterFib = true; }
+  S.fibMode = 1; refresh();
+}
+
+// ---------- decisiones ----------
+function openSheet(modal) { $('sheet').hidden = false; $('scrim').hidden = !modal; $('ovNote').value = ''; }
+function closeSheet() { $('sheet').hidden = true; $('scrim').hidden = true; }
+function decide(kind, auto) {
+  if (!S || S.phase !== 'live' || S.idx === 0) return;
+  S.fibMode = 0; S.paused = true;
+  const i = S.idx - 1, price = usd(ep.side > 0 ? S.a[i] : S.b[i]);
+  pending = { kind, idx:i, price, auto:!!auto };
+  if (kind === 'entro') {
+    S.decision = pending; S.phase = 'slpick';
+    $('ovTitle').textContent = (ep.side > 0 ? 'Compra' : 'Venta') + ' a ' + fmt(price);
+    $('ovSl').textContent = 'Toca el gráfico donde pondrías el SL (opcional).'; $('ovNoSl').hidden = false;
+    openSheet(false);
+  } else {
+    S.phase = 'note';
+    $('ovTitle').textContent = kind === 'no_entro' ? 'No entras' : 'Se acabó el caso sin decisión';
+    $('ovSl').textContent = ''; $('ovNoSl').hidden = true;
+    openSheet(true);
+  }
+  refresh();
+}
+async function save(withSl) {
+  if (!pending) return;
+  if (!withSl) S.sl = null;
+  const i = pending.idx, d = pending;
+  const rec = { id:ep.id, decision:d.kind, auto:d.auto, tf:ep.tf, lado:ep.side, tick_idx:i, t_ms:S.t[i],
+    tick_ms_utc:ep.m_start * 60000 + S.t[i], bid:usd(S.b[i]), ask:usd(S.a[i]),
+    precio_entrada:d.kind === 'entro' ? d.price : null, sl:S.sl, nota:$('ovNote').value.trim(),
+    fib:{ f1:ep.f1, f0:ep.f0 }, fib_original:S.fibFix ? true : false, fib_corregido:S.fibFix,
+    zona:{ lo:S.zLo, hi:S.zHi, toques:S.touches },
+    velocidad:speed, pausas:S.pauses, cambios_velocidad:S.speedChanges, rapido_usado:S.ffUsed,
+    vista:TFS.find(x => x[1] === viewTf)[0], velas_visibles:nCandles,
+    ms_desde_toque_0_78:S.firstTouch >= 0 ? S.t[i] - S.t[S.firstTouch] : null,
+    ms_desde_toque_zona:S.firstZone >= 0 ? S.t[i] - S.t[S.firstZone] : null,
+    segundos_reales:Math.round((performance.now() - S.wallStart) / 1000), guardado:new Date().toISOString() };
+  closeSheet();
+  try { await saveRecord(rec); done.add(ep.id); $('pDone').textContent = 'Hechos ' + done.size; }
+  catch (e) { banner('No se pudo guardar: ' + (e && (e.message || e.code) || e), 5000); }
+  S.decision = d; pending = null; S.phase = 'reveal'; S.paused = false; S.last = performance.now();
+  if (S.idx >= S.n) { S.phase = 'done'; showResult(); }
+  refresh();
+}
+function cancel() {
+  if (!pending) return;
+  closeSheet();
+  if (pending.auto) { save(false); return; }
+  pending = null; S.decision = null; S.sl = null; S.phase = 'live'; refresh();
+}
+function showResult() {
+  const d = S.decision, i0 = d.idx, sd = ep.side, ref = d.kind === 'entro' ? d.price : usd(S.b[i0]);
+  let mfe = 0, mae = 0, tpAt = -1, slAt = -1, brokeAt = -1;
+  for (let i = i0 + 1; i < S.n; i++) {
+    const exit = sd > 0 ? usd(S.b[i]) : usd(S.a[i]), mv = sd * (exit - ref);
+    if (mv > mfe) mfe = mv; if (-mv > mae) mae = -mv;
+    if (tpAt < 0 && sd * (exit - ep.fib50) >= 0) tpAt = i;
+    if (brokeAt < 0 && sd * (ep.f1 - exit) > 2) brokeAt = i;
+    if (S.sl != null && slAt < 0 && sd * (S.sl - exit) >= 0) slAt = i;
+  }
+  const when = i => i < 0 ? 'no' : 'sí, a los ' + Math.round((S.t[i] - S.t[i0]) / 60000) + ' min';
+  let txt = (d.kind === 'entro' ? 'Desde tu entrada' : 'Desde tu decisión') + ', en las 2 h siguientes:\n';
+  txt += 'A favor como máximo: ' + fmt(mfe) + ' USD\nEn contra como máximo: ' + fmt(mae) + ' USD\n';
+  txt += 'Llegó al Fib 0,50 (TP): ' + when(tpAt) + '\nRompió Fib 1 por más de 2 USD: ' + when(brokeAt);
+  if (S.sl != null) txt += '\nTu SL (' + fmt(S.sl) + '): ' + when(slAt) + '\nPrimero llegó: ' + (tpAt >= 0 && (slAt < 0 || tpAt < slAt) ? 'TP' : slAt >= 0 ? 'SL' : 'ninguno');
+  $('result').textContent = txt; $('resultBox').hidden = false;
+}
+function updateExport() {
+  const b = $('bExport'); b.hidden = store.kind !== 'device';
+  if (!b.hidden) b.textContent = 'Exportar mis decisiones (' + Object.keys(deviceAll()).length + ')';
+}
+function nextCase() {
+  if (busy) return;
+  const k = order.findIndex((o, j) => j > pos && !done.has(o.id));
+  load(k >= 0 ? k : (pos + 1) % order.length);
+}
+function skipCase() { if (S && S.phase === 'live') nextCase(); }
+
+// ---------- botones y teclado ----------
+$('bExport').addEventListener('click', exportDecisions);
+const ACTS = { pause:togglePause, ff:toggleFF, entro:() => decide('entro'), no_entro:() => decide('no_entro'), fib:startFib, orig:restoreFib, skip:skipCase, next:nextCase };
+document.querySelectorAll('[data-act]').forEach(b => b.addEventListener('click', () => ACTS[b.dataset.act]()));
+$('ovSave').addEventListener('click', () => save(true));
+$('ovNoSl').addEventListener('click', () => save(false));
+$('ovCancel').addEventListener('click', cancel);
+document.addEventListener('keydown', ev => {
+  if (ev.target.tagName === 'TEXTAREA') {
+    if (ev.key === 'Enter' && (ev.ctrlKey || ev.metaKey)) { ev.preventDefault(); save(true); }
+    if (ev.key === 'Escape') { ev.preventDefault(); cancel(); }
+    return;
+  }
+  if (ev.repeat) return;
+  const k = ev.key.toLowerCase(); let used = true;
+  if (k === ' ') togglePause();
+  else if (k === 'e') decide('entro');
+  else if (k === 'n') decide('no_entro');
+  else if (k === 'f') toggleFF();
+  else if (k === 'c') startFib();
+  else if (k === 's') skipCase();
+  else if (k === 'arrowright' || k === 'enter') { if (S && S.phase === 'done') nextCase(); else used = false; }
+  else if (k === 'escape') { if (S && S.fibMode) startFib(); else cancel(); }
+  else if (k >= '1' && k <= '5') setView(TFS[+k - 1][1]);
+  else if (k === '+') setSpeed(SPEEDS[Math.min(SPEEDS.length - 1, SPEEDS.indexOf(speed) + 1)]);
+  else if (k === '-') setSpeed(SPEEDS[Math.max(0, SPEEDS.indexOf(speed) - 1)]);
+  else used = false;
+  if (used) ev.preventDefault();
+});
+start().catch(e => banner('Error: ' + e.message));
+</script>
+
+<script>
+if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+</script>
+</body>
+</html>
