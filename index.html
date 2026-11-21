@@ -14,7 +14,7 @@
 <meta name="apple-mobile-web-app-title" content="Simulador">
 </head>
 <body>
-<script>window.SIM_VERSION="4c4e017f8b";window.SIM_SUPA=null;</script>
+<script>window.SIM_VERSION="41d0acd59e";window.SIM_SUPA=null;</script>
 <title>Simulador de Reacción</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -79,6 +79,23 @@
   .extra { display:flex; flex-direction:column; gap:12px; }
   .extra > button:only-child, .extra > #bExport { width:100%; }
   .sm { display:none; }
+  .cfgBtn { margin-left:auto; padding:3px 10px; border-radius:999px; font-size:13px; }
+  .sheet.cfg { z-index:6; max-height:calc(100% - 72px); overflow:auto; gap:12px; }
+  .clbl { color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.06em; margin-bottom:5px; }
+  .crow { display:flex; gap:14px; flex-wrap:wrap; align-items:center; }
+  .crow label { display:flex; align-items:center; gap:6px; }
+  .cchk { display:grid; grid-template-columns:1fr 1fr; gap:6px 10px; }
+  .chk { display:flex; align-items:center; gap:6px; cursor:pointer; }
+  .chk input { width:18px; height:18px; accent-color:var(--tp); margin:0; }
+  input[type=color] { width:38px; height:28px; padding:0 2px; border:1px solid var(--line); border-radius:6px; background:var(--raise); cursor:pointer; }
+  /* Temas: los mandos siguen al tema elegido en Ajustes (el grafico toma sus colores de CFG). */
+  :root[data-tema="negro"] { --bg:#000; --panel:#0a0b0d; --raise:#16181c; --line:#24272d; }
+  :root[data-tema="claro"] { --bg:#f3f5f8; --panel:#ffffff; --raise:#eef1f5; --line:#d3d9e1; --text:#1b2330; --muted:#5d6878; --gold:#b8860b; --tp:#2f6fd6; color-scheme:light; }
+  :root[data-tema="claro"] button.on { background:#d9e5f7; border-color:#7b98c4; }
+  :root[data-tema="claro"] #bEntro.buyc { background:#d3f0eb; }
+  :root[data-tema="claro"] #bEntro.sellc { background:#fbdedc; }
+  :root[data-tema="claro"] #price { color:#111; }
+  :root[data-tema="claro"] .scrim { background:#0005; }
   @media (hover:none) { kbd { display:none; } }
   @media (max-width:899px) {
     .lg { display:none; } .sm { display:inline; }
@@ -99,6 +116,8 @@
     #price { font-size:17px; } #clock { font-size:11px; }
     .top { padding-block:5px; padding-left:max(10px, env(safe-area-inset-left, 0px)); padding-right:max(10px, env(safe-area-inset-right, 0px)); flex-wrap:nowrap; overflow:hidden; }
     #pLegPill, #pDone { display:none; }
+    .sheet.cfg { max-height:58%; gap:10px; }
+    .cchk { gap:8px 10px; }
     .help { display:none; }
     .top h1 { display:none; }
     .sheet { left:0; right:0; top:auto; bottom:0; width:auto; border-radius:12px 12px 0 0;
@@ -140,6 +159,7 @@
     <span class="pill"><b id="pSide">–</b></span>
     <span class="pill" id="pLegPill">Tramo <b id="pLeg">–</b></span>
     <span class="pill" id="pDone">Hechos 0</span>
+    <button id="bCfg" class="cfgBtn" aria-label="Ajustes" title="Ajustes de colores y visualización">⚙<span class="lg"> Ajustes</span></button>
   </header>
   <div class="stage">
     <div id="chartWrap"><canvas id="cv"></canvas><div id="banner" hidden></div><div id="pausedTag" hidden>EN PAUSA</div></div>
@@ -184,6 +204,33 @@
     <button id="bHideRes">Ver gráfico</button>
   </div>
 </div>
+<div class="sheet cfg" id="cfgBox" hidden>
+  <h2>Ajustes</h2>
+  <div><div class="clbl">Tema</div><div class="seg" id="cfTema">
+    <button data-v="oscuro">Oscuro</button><button data-v="negro">Negro</button><button data-v="claro">Claro</button></div></div>
+  <div><div class="clbl">Velas</div>
+    <div class="crow"><label>Alcista <input type="color" id="cfUp"></label><label>Bajista <input type="color" id="cfDown"></label>
+      <label class="chk"><input type="checkbox" id="cfHollow"> Alcistas huecas</label></div>
+    <div class="seg" id="cfPreset" style="margin-top:6px">
+      <button data-up="#22a495" data-down="#e5534b">Verde/Rojo</button><button data-up="#2f81f7" data-down="#f0883e">Azul/Naranja</button>
+      <button data-up="#e6e6e6" data-down="#6e7681">Blanco/Gris</button></div></div>
+  <div><div class="clbl">Grosor de las velas</div><div class="seg" id="cfWidth">
+    <button data-v="0.5">Fina</button><button data-v="0.7">Normal</button><button data-v="0.88">Gruesa</button></div></div>
+  <div><div class="clbl">Fibonacci</div>
+    <div class="crow"><label>Niveles <input type="color" id="cfFib"></label><label>TP 0,50 <input type="color" id="cfTp"></label></div></div>
+  <div><div class="clbl">Mostrar</div>
+    <div class="cchk">
+      <label class="chk"><input type="checkbox" id="cfGrid"> Cuadrícula</label>
+      <label class="chk"><input type="checkbox" id="cfBand"> Sombreado 0,78–1</label>
+      <label class="chk"><input type="checkbox" id="cfStrip"> Franja de toques</label>
+      <label class="chk"><input type="checkbox" id="cf618"> Nivel 0,618</label>
+      <label class="chk"><input type="checkbox" id="cfDiag"> Línea del tramo</label>
+      <label class="chk"><input type="checkbox" id="cfLabels"> Precios en las líneas</label>
+    </div></div>
+  <div><div class="clbl">Texto del gráfico</div><div class="seg" id="cfFont">
+    <button data-v="10">Pequeño</button><button data-v="12">Normal</button><button data-v="14">Grande</button></div></div>
+  <div class="row"><button class="on" id="cfClose" style="flex:1">Listo</button><button id="cfReset">Restablecer</button></div>
+</div>
 <div class="scrim" id="scrim" hidden></div>
 <div class="sheet" id="sheet" hidden>
   <h2 id="ovTitle"></h2>
@@ -201,6 +248,24 @@ const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
 const $ = id => document.getElementById(id);
 let order = [], done = new Set(), pos = 0, ep = null, S = null, geo = null, pending = null, busy = false;
 let viewTf = 5, nCandles = 120, speed = 1;
+
+// ---------- ajustes de visualizacion (se guardan en este dispositivo) ----------
+const CKEY = 'sim_ajustes_v1';
+const CFG_DEF = { tema:'oscuro', up:'#22a495', down:'#e5534b', hollow:false, width:0.7, fib:'#d6a630', tp:'#5b9cf5',
+                  grid:true, band:true, strip:true, f618:true, diag:true, labels:true, font:12 };
+const THEMES = {
+  oscuro:{ bg:'#0e1116', grid:'#1a2028', axis:'#5b6576', cur:'#c9ced6', curTxt:'#111', fg:'#ffffff', f0:'#8a94a4' },
+  negro: { bg:'#000000', grid:'#15171b', axis:'#6b7280', cur:'#d0d4da', curTxt:'#000', fg:'#ffffff', f0:'#8a94a4' },
+  claro: { bg:'#ffffff', grid:'#edf0f4', axis:'#6b7480', cur:'#3b4452', curTxt:'#fff', fg:'#111827', f0:'#6b7480' } };
+let CFG = { ...CFG_DEF };
+try { CFG = { ...CFG_DEF, ...JSON.parse(localStorage.getItem(CKEY) || '{}') }; } catch (e) {}
+if (!THEMES[CFG.tema]) CFG.tema = 'oscuro';
+function saveCfg() { try { localStorage.setItem(CKEY, JSON.stringify(CFG)); } catch (e) {} }
+function applyTheme() {
+  if (CFG.tema === 'oscuro') document.documentElement.removeAttribute('data-tema'); else document.documentElement.setAttribute('data-tema', CFG.tema);
+  const m = document.querySelector('meta[name="theme-color"]'); if (m) m.content = THEMES[CFG.tema].bg;
+}
+applyTheme();
 const usd = c => (ep.base + c) / 100;
 const fmt = v => v.toFixed(2);
 
@@ -425,9 +490,10 @@ function draw() {
   if (!W || !H) return;
   if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.fillStyle = '#0e1116'; ctx.fillRect(0, 0, W, H);
+  const T = THEMES[CFG.tema], FC = CFG.fib, fs = CFG.font + (W < 500 ? -1 : 0);
+  ctx.fillStyle = T.bg; ctx.fillRect(0, 0, W, H);
   const cs = aggregate(viewTf, nCandles); if (!cs.length) return;
-  const small = W < 500, padR = small ? 64 : 92, padB = 20, pw = W - padR, ph = H - padB, cw = pw / nCandles, off = ep.utc_minute_of_day;
+  const small = W < 500, padR = Math.round(fs * 7.6) + 8, padB = 20, pw = W - padR, ph = H - padB, cw = pw / nCandles, off = ep.utc_minute_of_day;
   let lo = Infinity, hi = -Infinity;
   cs.forEach(c => { lo = Math.min(lo, usd(c.l)); hi = Math.max(hi, usd(c.h)); });
   [S.lo, S.hi, ep.fib50].forEach(v => { lo = Math.min(lo, v); hi = Math.max(hi, v); });
@@ -436,37 +502,50 @@ function draw() {
   const y = v => ph - (v - lo) / (hi - lo) * ph;
   const xOfMin = m => { if (m == null) return null; const i = Math.floor((m + off) / viewTf) - cs[0].k; return (i >= 0 && i < cs.length) ? i * cw + cw / 2 : null; };
   geo = { lo, hi, ph, pw, cw, cs };
-  ctx.font = (small ? 10 : 11) + 'px ' + 'JetBrains Mono, monospace'; ctx.lineWidth = 1;
+  ctx.font = fs + 'px ' + 'JetBrains Mono, monospace'; ctx.lineWidth = 1;
   const step = niceStep((hi - lo) / (small ? 6 : 8));
   for (let v = Math.ceil(lo / step) * step; v < hi; v += step) {
-    const yy = Math.round(y(v)) + .5; ctx.strokeStyle = '#1a2028'; ctx.beginPath(); ctx.moveTo(0, yy); ctx.lineTo(pw, yy); ctx.stroke();
-    ctx.fillStyle = '#5b6576'; ctx.fillText(fmt(v), pw + 5, yy + 4);
+    const yy = Math.round(y(v)) + .5;
+    if (CFG.grid) { ctx.strokeStyle = T.grid; ctx.beginPath(); ctx.moveTo(0, yy); ctx.lineTo(pw, yy); ctx.stroke(); }
+    ctx.fillStyle = T.axis; ctx.fillText(fmt(v), pw + 5, yy + 4);
   }
-  ctx.fillStyle = '#d6a6301a'; ctx.fillRect(0, y(S.hi), pw, y(S.lo) - y(S.hi));                     // zona 0,78-1
-  ctx.fillStyle = '#d6a63055'; ctx.fillRect(0, y(S.zHi), pw, Math.max(2, y(S.zLo) - y(S.zHi)));      // franja de maximo toque
-  ctx.fillStyle = '#d6a630'; const zl = 'Zona · ' + S.touches + ' toques'; ctx.fillText(zl, 6, y(S.zHi) - 4);
-  const style = { '1':['#d6a630',[]], '0,78':['#d6a630',[4,4]], '0,618':['#a3853a',[2,4]], '0,50':['#5b9cf5',[6,4]], '0':['#8a94a4',[]] };
-  for (const k in ep.lv) { const v = ep.lv[k]; if (v > lo && v < hi) hline(v, style[k][0], (k === '0,50' ? '0,50 TP' : k) + ' ' + fmt(v), y, pw, style[k][1]); }
+  if (CFG.band) { ctx.fillStyle = FC + '1a'; ctx.fillRect(0, y(S.hi), pw, y(S.lo) - y(S.hi)); }                       // zona 0,78-1
+  if (CFG.strip) {                                                                                                  // franja de maximo toque
+    ctx.fillStyle = FC + '55'; ctx.fillRect(0, y(S.zHi), pw, Math.max(2, y(S.zLo) - y(S.zHi)));
+    ctx.fillStyle = FC; ctx.fillText('Zona · ' + S.touches + ' toques', 6, y(S.zHi) - 4);
+  }
+  const style = { '1':[FC,[]], '0,78':[FC,[4,4]], '0,618':[FC + 'b0',[2,4]], '0,50':[CFG.tp,[6,4]], '0':[T.f0,[]] };
+  for (const k in ep.lv) {
+    if (k === '0,618' && !CFG.f618) continue;
+    const v = ep.lv[k]; if (v > lo && v < hi) hline(v, style[k][0], CFG.labels ? (k === '0,50' ? '0,50 TP' : k) + ' ' + fmt(v) : (k === '0,50' ? 'TP' : k), y, pw, style[k][1]);
+  }
   const x1 = xOfMin(S.fibFix ? S.fibFix.m1 : ep.a1), x0 = xOfMin(S.fibFix ? S.fibFix.m0 : ep.a0);
-  if (x1 != null && x0 != null) { ctx.setLineDash([3, 3]); ctx.strokeStyle = '#d6a63099'; ctx.beginPath(); ctx.moveTo(x1, y(ep.f1)); ctx.lineTo(x0, y(ep.f0)); ctx.stroke(); ctx.setLineDash([]); }
-  const bw = Math.max(1, cw * 0.7);
+  if (CFG.diag && x1 != null && x0 != null) { ctx.setLineDash([3, 3]); ctx.strokeStyle = FC + '99'; ctx.beginPath(); ctx.moveTo(x1, y(ep.f1)); ctx.lineTo(x0, y(ep.f0)); ctx.stroke(); ctx.setLineDash([]); }
+  const bw = Math.max(1, cw * CFG.width);
   cs.forEach((c, i) => {
-    const x = i * cw + cw / 2; ctx.strokeStyle = ctx.fillStyle = c.c >= c.o ? '#22a495' : '#e5534b';
-    ctx.beginPath(); ctx.moveTo(Math.round(x) + .5, y(usd(c.h))); ctx.lineTo(Math.round(x) + .5, y(usd(c.l))); ctx.stroke();
-    const yo = y(usd(c.o)), yc = y(usd(c.c)); ctx.fillRect(x - bw / 2, Math.min(yo, yc), bw, Math.max(1, Math.abs(yc - yo)));
+    const x = i * cw + cw / 2, upc = c.c >= c.o; ctx.strokeStyle = ctx.fillStyle = upc ? CFG.up : CFG.down;
+    const yo = y(usd(c.o)), yc = y(usd(c.c)), top = Math.min(yo, yc), hgt = Math.max(1, Math.abs(yc - yo));
+    const xl = Math.round(x) + .5;
+    if (upc && CFG.hollow && bw >= 3) {
+      ctx.beginPath(); ctx.moveTo(xl, y(usd(c.h))); ctx.lineTo(xl, top); ctx.moveTo(xl, top + hgt); ctx.lineTo(xl, y(usd(c.l))); ctx.stroke();
+      ctx.strokeRect(Math.round(x - bw / 2) + .5, Math.round(top) + .5, Math.max(1, Math.round(bw) - 1), Math.max(1, Math.round(hgt)));
+    } else {
+      ctx.beginPath(); ctx.moveTo(xl, y(usd(c.h))); ctx.lineTo(xl, y(usd(c.l))); ctx.stroke();
+      ctx.fillRect(x - bw / 2, top, bw, hgt);
+    }
   });
-  if (x1 != null) dot(x1, y(ep.f1), '#d6a630', '1'); if (x0 != null) dot(x0, y(ep.f0), '#8a94a4', '0');
-  ctx.fillStyle = '#5b6576'; const every = Math.max(1, Math.round(nCandles / (small ? 4 : 8)));
+  if (x1 != null) dot(x1, y(ep.f1), FC, '1'); if (x0 != null) dot(x0, y(ep.f0), T.f0, '0');
+  ctx.fillStyle = T.axis; const every = Math.max(1, Math.round(nCandles / (small ? 4 : 8)));
   cs.forEach((c, i) => { if ((cs.length - 1 - i) % every === 0) { const md = ((c.k * viewTf) % 1440 + 1440) % 1440; ctx.fillText(hhmm(md), i * cw, H - 5); } });
   if (S.idx > 0) {
     const p = usd(S.b[S.idx - 1]), yy = y(p);
-    ctx.setLineDash([3, 3]); ctx.strokeStyle = '#c9ced6'; ctx.beginPath(); ctx.moveTo(0, yy); ctx.lineTo(pw, yy); ctx.stroke(); ctx.setLineDash([]);
-    ctx.fillStyle = '#c9ced6'; ctx.fillRect(pw, yy - 9, padR, 18); ctx.fillStyle = '#111'; ctx.fillText(fmt(p), pw + 5, yy + 4);
+    ctx.setLineDash([3, 3]); ctx.strokeStyle = T.cur; ctx.beginPath(); ctx.moveTo(0, yy); ctx.lineTo(pw, yy); ctx.stroke(); ctx.setLineDash([]);
+    const bh = fs + 8; ctx.fillStyle = T.cur; ctx.fillRect(pw, yy - bh / 2, padR, bh); ctx.fillStyle = T.curTxt; ctx.fillText(fmt(p), pw + 5, yy + fs * 0.36);
   }
-  if (S.decision && S.decision.kind === 'entro') hline(S.decision.price, '#ffffff', 'Entrada ' + fmt(S.decision.price), y, pw, []);
+  if (S.decision && S.decision.kind === 'entro') hline(S.decision.price, T.fg, 'Entrada ' + fmt(S.decision.price), y, pw, []);
   if (S.sl != null) hline(S.sl, '#e5534b', 'SL ' + fmt(S.sl), y, pw, [5, 3]);
-  if (S.fibTmp) { const xt = xOfMin(S.fibTmp.minute); ctx.strokeStyle = '#d6a630'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(xt == null ? 12 : xt, y(S.fibTmp.price), 9, 0, 7); ctx.stroke(); ctx.lineWidth = 1; }
-  if (S.fibMode) { ctx.fillStyle = '#d6a630'; ctx.font = '600 13px Inter, system-ui'; ctx.fillText(S.fibMode === 1 ? 'Toca el cuerpo de vela del nivel 1 (' + (ep.side > 0 ? 'mínimo' : 'máximo') + ' del tramo)' : 'Ahora toca el cuerpo del nivel 0 (' + (ep.side > 0 ? 'máximo' : 'mínimo') + ')', 10, 34); }
+  if (S.fibTmp) { const xt = xOfMin(S.fibTmp.minute); ctx.strokeStyle = FC; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(xt == null ? 12 : xt, y(S.fibTmp.price), 9, 0, 7); ctx.stroke(); ctx.lineWidth = 1; }
+  if (S.fibMode) { ctx.fillStyle = FC; ctx.font = '600 13px Inter, system-ui'; ctx.fillText(S.fibMode === 1 ? 'Toca el cuerpo de vela del nivel 1 (' + (ep.side > 0 ? 'mínimo' : 'máximo') + ' del tramo)' : 'Ahora toca el cuerpo del nivel 0 (' + (ep.side > 0 ? 'máximo' : 'mínimo') + ')', 10, 34); }
 }
 function hline(v, col, label, y, pw, dash) {
   const yy = Math.round(y(v)) + .5; ctx.setLineDash(dash); ctx.strokeStyle = col; ctx.beginPath(); ctx.moveTo(0, yy); ctx.lineTo(pw, yy); ctx.stroke(); ctx.setLineDash([]);
@@ -667,12 +746,46 @@ $('bShare').addEventListener('click', async () => {
   try { await navigator.clipboard.writeText(url); banner('Enlace copiado: ' + url, 3500); }
   catch (e) { banner(url, 6000); }
 });
+// Panel de ajustes: cada cambio se aplica al momento y se guarda.
+const CF_CHK = { cfHollow:'hollow', cfGrid:'grid', cfBand:'band', cfStrip:'strip', cf618:'f618', cfDiag:'diag', cfLabels:'labels' };
+const CF_COL = { cfUp:'up', cfDown:'down', cfFib:'fib', cfTp:'tp' };
+function syncCfgUi() {
+  for (const id in CF_CHK) $(id).checked = !!CFG[CF_CHK[id]];
+  for (const id in CF_COL) $(id).value = CFG[CF_COL[id]];
+  document.querySelectorAll('#cfTema button').forEach(b => b.classList.toggle('on', b.dataset.v === CFG.tema));
+  document.querySelectorAll('#cfWidth button').forEach(b => b.classList.toggle('on', +b.dataset.v === CFG.width));
+  document.querySelectorAll('#cfFont button').forEach(b => b.classList.toggle('on', +b.dataset.v === CFG.font));
+  document.querySelectorAll('#cfPreset button').forEach(b => b.classList.toggle('on', b.dataset.up === CFG.up && b.dataset.down === CFG.down));
+}
+function cfgChanged() { saveCfg(); applyTheme(); syncCfgUi(); if (S) draw(); }
+// Sin velo oscuro, para ver los cambios en el grafico; la reproduccion se pausa mientras el panel esta abierto.
+let cfgPaused = false;
+function openCfg() {
+  syncCfgUi(); $('cfgBox').hidden = false;
+  cfgPaused = !!(S && (S.phase === 'live' || S.phase === 'reveal') && !S.paused);
+  if (cfgPaused) { S.paused = true; S.last = performance.now(); refresh(); }
+}
+function closeCfg() {
+  $('cfgBox').hidden = true;
+  if (cfgPaused && S && S.paused && (S.phase === 'live' || S.phase === 'reveal')) { S.paused = false; S.last = performance.now(); refresh(); }
+  cfgPaused = false;
+}
+$('bCfg').addEventListener('click', () => $('cfgBox').hidden ? openCfg() : closeCfg());
+$('cfClose').addEventListener('click', closeCfg);
+$('cfReset').addEventListener('click', () => { CFG = { ...CFG_DEF }; cfgChanged(); });
+for (const id in CF_CHK) $(id).addEventListener('change', () => { CFG[CF_CHK[id]] = $(id).checked; cfgChanged(); });
+for (const id in CF_COL) $(id).addEventListener('input', () => { CFG[CF_COL[id]] = $(id).value; cfgChanged(); });
+document.querySelectorAll('#cfTema button').forEach(b => b.addEventListener('click', () => { CFG.tema = b.dataset.v; cfgChanged(); }));
+document.querySelectorAll('#cfWidth button').forEach(b => b.addEventListener('click', () => { CFG.width = +b.dataset.v; cfgChanged(); }));
+document.querySelectorAll('#cfFont button').forEach(b => b.addEventListener('click', () => { CFG.font = +b.dataset.v; cfgChanged(); }));
+document.querySelectorAll('#cfPreset button').forEach(b => b.addEventListener('click', () => { CFG.up = b.dataset.up; CFG.down = b.dataset.down; cfgChanged(); }));
 const ACTS = { pause:togglePause, ff:toggleFF, entro:() => decide('entro'), no_entro:() => decide('no_entro'), fib:startFib, orig:restoreFib, skip:skipCase, next:nextCase };
 document.querySelectorAll('[data-act]').forEach(b => b.addEventListener('click', () => ACTS[b.dataset.act]()));
 $('ovSave').addEventListener('click', () => save(true));
 $('ovNoSl').addEventListener('click', () => save(false));
 $('ovCancel').addEventListener('click', cancel);
 document.addEventListener('keydown', ev => {
+  if (!$('cfgBox').hidden) { if (ev.key === 'Escape') { ev.preventDefault(); closeCfg(); } return; }
   if (ev.target.tagName === 'TEXTAREA') {
     if (ev.key === 'Enter' && (ev.ctrlKey || ev.metaKey)) { ev.preventDefault(); save(true); }
     if (ev.key === 'Escape') { ev.preventDefault(); cancel(); }
