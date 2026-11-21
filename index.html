@@ -14,7 +14,7 @@
 <meta name="apple-mobile-web-app-title" content="Simulador">
 </head>
 <body>
-<script>window.SIM_VERSION="d14043e1fb";window.SIM_SUPA=null;</script>
+<script>window.SIM_VERSION="e67a906b77";window.SIM_SUPA=null;</script>
 <title>Simulador de Reacción</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -122,6 +122,10 @@
         <button class="big" id="bNext" data-act="next" style="width:100%;margin-top:8px">Siguiente caso<kbd>→</kbd></button>
       </div>
       <button id="bExport" hidden>Exportar mis decisiones</button>
+      <div class="seg" id="appRow" hidden>
+        <button id="bInstall" hidden>Instalar en este equipo</button>
+        <button id="bShare">Compartir la app</button>
+      </div>
       <details class="help" open>
         <summary>Cómo usarlo</summary>
         <p>Fibonacci de la estructura externa, de cuerpo a cuerpo: del cuerpo más bajo al más alto del tramo (los dos puntos).
@@ -590,6 +594,23 @@ function skipCase() { if (S && S.phase === 'live') nextCase(); }
 
 // ---------- botones y teclado ----------
 $('bExport').addEventListener('click', exportDecisions);
+// Instalar y compartir (solo en la app publica: alli hay service worker y una URL que compartir).
+let installEvt = null;
+if (location.protocol === 'https:' && !/claude\.ai|claudeusercontent/.test(location.hostname)) $('appRow').hidden = false;
+window.addEventListener('beforeinstallprompt', ev => { ev.preventDefault(); installEvt = ev; $('bInstall').hidden = false; });
+window.addEventListener('appinstalled', () => { $('bInstall').hidden = true; banner('App instalada', 2500); });
+$('bInstall').addEventListener('click', async () => {
+  if (!installEvt) return;
+  installEvt.prompt(); try { await installEvt.userChoice; } catch (e) {}
+  installEvt = null; $('bInstall').hidden = true;
+});
+$('bShare').addEventListener('click', async () => {
+  const url = location.origin + location.pathname;
+  try { if (navigator.share) { await navigator.share({ title:'Simulador de Reacción', text:'Practica entradas en la golden zone del oro con ticks reales:', url }); return; } }
+  catch (e) { if (e && e.name === 'AbortError') return; }
+  try { await navigator.clipboard.writeText(url); banner('Enlace copiado: ' + url, 3500); }
+  catch (e) { banner(url, 6000); }
+});
 const ACTS = { pause:togglePause, ff:toggleFF, entro:() => decide('entro'), no_entro:() => decide('no_entro'), fib:startFib, orig:restoreFib, skip:skipCase, next:nextCase };
 document.querySelectorAll('[data-act]').forEach(b => b.addEventListener('click', () => ACTS[b.dataset.act]()));
 $('ovSave').addEventListener('click', () => save(true));
