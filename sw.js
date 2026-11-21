@@ -1,5 +1,5 @@
 // Service worker: la app abre sin conexion y guarda los casos ya vistos.
-const SHELL = 'sim-shell-18bd746007', CASOS = 'sim-casos-v2';   // v2: casos de 4 h (cambia el nombre para no reutilizar los de 2 h)
+const SHELL = 'sim-shell-eb71df56d0', CASOS = 'sim-casos-v2';   // v2: casos de 4 h (cambia el nombre para no reutilizar los de 2 h)
 const FILES = ['./', 'index.html', 'manifest.webmanifest', 'casos/indice.json', 'iconos/icono-192.png', 'iconos/icono-512.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(SHELL).then(c => c.addAll(FILES)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => {

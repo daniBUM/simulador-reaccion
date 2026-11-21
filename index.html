@@ -14,7 +14,7 @@
 <meta name="apple-mobile-web-app-title" content="Simulador">
 </head>
 <body>
-<script>window.SIM_VERSION="18bd746007";window.SIM_SUPA=null;</script>
+<script>window.SIM_VERSION="eb71df56d0";window.SIM_SUPA=null;</script>
 <title>Simulador de Reacción</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -44,6 +44,9 @@
   #chartWrap { position:relative; min-height:0; }
   canvas { position:absolute; inset:0; width:100%; height:100%; display:block; touch-action:none; }
   #banner { position:absolute; top:10px; left:50%; transform:translateX(-50%); background:var(--gold); color:#111; padding:5px 12px; border-radius:6px; font-weight:600; font-size:13px; z-index:2; max-width:90%; text-align:center; }
+  .liveBtn { position:absolute; left:max(10px, env(safe-area-inset-left, 0px)); bottom:28px; z-index:2; padding:5px 12px; border-radius:999px; font-size:13px; font-weight:600; background:var(--panel); box-shadow:0 2px 8px #0006; }
+  .liveBtn#bLive { left:calc(max(10px, env(safe-area-inset-left, 0px)) + 82px); }
+  .typeBtn { min-width:74px; }
   #pausedTag { position:absolute; top:10px; left:max(10px, env(safe-area-inset-left, 0px)); background:var(--down); color:#fff; padding:2px 9px; border-radius:5px; font-weight:700; font-size:12px; z-index:2; }
   .panel { border-left:1px solid var(--line); background:var(--panel); display:flex; flex-direction:column; gap:12px; overflow:auto;
            padding-block:12px; padding-left:14px; padding-right:max(14px, env(safe-area-inset-right, 0px)); }
@@ -172,7 +175,7 @@
     <button id="bCfg" class="cfgBtn" aria-label="Ajustes" title="Ajustes de colores y visualización">⚙<span class="lg"> Ajustes</span></button>
   </header>
   <div class="stage">
-    <div id="chartWrap"><canvas id="cv"></canvas><div id="banner" hidden></div><div id="pausedTag" hidden>EN PAUSA</div></div>
+    <div id="chartWrap"><canvas id="cv"></canvas><div id="banner" hidden></div><div id="pausedTag" hidden>EN PAUSA</div><button id="bType" class="liveBtn typeBtn" title="Cambiar entre velas y línea">Línea</button><button id="bLive" class="liveBtn" hidden title="Volver a la vista automática (o doble toque en el gráfico)">⟲ Ajustar</button></div>
     <aside class="panel">
       <div class="quote"><span id="price">–</span><span id="clock">–</span></div>
       <div><div class="lbl">Velas</div><div class="seg" id="tfRow"></div></div>
@@ -200,8 +203,8 @@
         <p>Fibonacci de la estructura externa, de cuerpo a cuerpo: del cuerpo más bajo al más alto del tramo (los dos puntos).
         La franja dorada intensa es la zona con más toques dentro de 0,78–1, de 1,70 USD como máximo.
         Pulsa ENTRO en el instante en que entrarías en directo.</p>
-        <p>Si el Fibo está mal, arrastra la línea 1 o la 0 hasta el cuerpo correcto, o pulsa Corregir Fibo y toca el nivel 1 y luego el 0. Siempre se ajusta al cuerpo de la vela más cercana.
-        Zoom: rueda del ratón o dos dedos. Horas en UTC; la fecha va oculta.</p>
+        <p>Si el Fibo está mal, pulsa Corregir Fibo y arrastra la línea 1 o la 0 hasta el cuerpo correcto, o toca el nivel 1 y luego el 0. Siempre se ajusta al cuerpo de la vela más cercana.
+        Mueve el gráfico arrastrando (hacia los lados para ver el pasado, arriba y abajo para el precio); arrastra la escala de precios para estirarla. ⟲ Ajustar o doble toque lo devuelven al directo. Zoom: rueda del ratón o dos dedos. Horas en UTC; la fecha va oculta.</p>
       </details>
     </aside>
   </div>
@@ -218,6 +221,9 @@
   <div class="grip"><h2>Ajustes</h2><button class="minb" aria-label="Plegar">–</button></div>
   <div><div class="clbl">Tema</div><div class="seg" id="cfTema">
     <button data-v="oscuro">Oscuro</button><button data-v="negro">Negro</button><button data-v="claro">Claro</button></div></div>
+  <div><div class="clbl">Tipo de gráfico</div><div class="seg" id="cfType">
+    <button data-v="0">Velas</button><button data-v="1">Línea (cierres)</button></div>
+    <div class="crow" style="margin-top:6px"><label>Color de la línea <input type="color" id="cfLineCol"></label></div></div>
   <div><div class="clbl">Velas</div>
     <div class="crow"><label>Alcista <input type="color" id="cfUp"></label><label>Bajista <input type="color" id="cfDown"></label>
       <label class="chk"><input type="checkbox" id="cfHollow"> Alcistas huecas</label></div>
@@ -266,7 +272,7 @@ let viewTf = 5, nCandles = 120, speed = 1;
 // ---------- ajustes de visualizacion (se guardan en este dispositivo) ----------
 const CKEY = 'sim_ajustes_v1';
 const CFG_DEF = { tema:'oscuro', up:'#22a495', down:'#e5534b', hollow:false, width:0.7, fib:'#d6a630', tp:'#5b9cf5',
-                  grid:true, band:true, strip:true, f618:true, diag:true, labels:true, font:12, autoZona:false };
+                  grid:true, band:true, strip:true, f618:true, diag:true, labels:true, font:12, autoZona:false, line:false, lineCol:'#4ea1ff' };
 const THEMES = {
   oscuro:{ bg:'#0e1116', grid:'#1a2028', axis:'#5b6576', cur:'#c9ced6', curTxt:'#111', fg:'#ffffff', f0:'#8a94a4' },
   negro: { bg:'#000000', grid:'#15171b', axis:'#6b7280', cur:'#d0d4da', curTxt:'#000', fg:'#ffffff', f0:'#8a94a4' },
@@ -365,7 +371,7 @@ SPEEDS.forEach(s => { const b = mkBtn(s + '×', () => setSpeed(s)); b.dataset.sp
 // Ningun boton conserva el foco tras un clic: asi Espacio o Enter no lo vuelven a pulsar.
 document.addEventListener('pointerup', () => { const a = document.activeElement; if (a && a.tagName === 'BUTTON') a.blur(); });
 
-function setView(m) { viewTf = m; refresh(); }
+function setView(m) { viewTf = m; resetView(); refresh(); }
 function setSpeed(s) { speed = s; if (S) { S.ff = false; S.speedChanges++; } refresh(); }
 function refresh() {
   document.querySelectorAll('#tfRow button').forEach(b => b.classList.toggle('on', +b.dataset.tf === viewTf));
@@ -442,7 +448,7 @@ async function load(p) {
           decision:null, sl:null, fibMode:0, fibFix:null, wallStart:performance.now(), last:performance.now(), warned:false };
     ep.orig = { f1:ep.f1, f0:ep.f0, zlo:ep.zona_lo, zhi:ep.zona_hi, t:ep.toques };
     setFib(ep.f1, ep.f0, ep.zona_lo, ep.zona_hi, ep.toques);
-    viewTf = ep.tf_min; nCandles = Math.max(40, Math.min(300, Math.ceil(-ep.a1 / ep.tf_min) + 16));
+    resetView(); viewTf = ep.tf_min; nCandles = Math.max(40, Math.min(300, Math.ceil(-ep.a1 / ep.tf_min) + 16));
     speed = 1; $('banner').hidden = true;
     $('pEp').innerHTML = 'Caso <b>' + (pos + 1) + '</b>/' + order.length;
     $('pTf').textContent = ep.tf;
@@ -529,13 +535,21 @@ function draw() {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   const T = THEMES[CFG.tema], FC = CFG.fib, fs = CFG.font + (W < 500 ? -1 : 0);
   ctx.fillStyle = T.bg; ctx.fillRect(0, 0, W, H);
-  const cs = aggregate(viewTf, nCandles); if (!cs.length) return;
+  const all = aggregate(viewTf, nCandles + view.off); if (!all.length) return;
+  view.off = Math.min(view.off, Math.max(0, all.length - 10));
+  const cs = all.slice(Math.max(0, all.length - view.off - nCandles), all.length - view.off); if (!cs.length) return;
+  // Si se mira el pasado, la vista se queda quieta aunque lleguen velas nuevas.
+  const lastK = all[all.length - 1].k;
+  if (view.off > 0 && view.lastK != null && lastK > view.lastK) view.off += lastK - view.lastK;
+  view.lastK = lastK;
+  const mv = viewMoved(); if ($('bLive').hidden === mv) $('bLive').hidden = !mv;
   const small = W < 500, padR = Math.round(fs * 7.6) + 8, padB = 20, pw = W - padR, ph = H - padB, cw = pw / nCandles, off = ep.utc_minute_of_day;
   let lo = Infinity, hi = -Infinity;
   cs.forEach(c => { lo = Math.min(lo, usd(c.l)); hi = Math.max(hi, usd(c.h)); });
   [S.lo, S.hi, ep.fib50].forEach(v => { lo = Math.min(lo, v); hi = Math.max(hi, v); });
   if (S.sl != null) { lo = Math.min(lo, S.sl); hi = Math.max(hi, S.sl); }
   const pad = (hi - lo) * 0.06 || 1; lo -= pad; hi += pad;
+  if (view.y) { lo = view.y.lo; hi = view.y.hi; }
   const y = v => ph - (v - lo) / (hi - lo) * ph;
   const xOfMin = m => { if (m == null) return null; const i = Math.floor((m + off) / viewTf) - cs[0].k; return (i >= 0 && i < cs.length) ? i * cw + cw / 2 : null; };
   geo = { lo, hi, ph, pw, cw, cs };
@@ -559,7 +573,12 @@ function draw() {
   const x1 = xOfMin(S.fibFix ? S.fibFix.m1 : ep.a1), x0 = xOfMin(S.fibFix ? S.fibFix.m0 : ep.a0);
   if (CFG.diag && x1 != null && x0 != null) { ctx.setLineDash([3, 3]); ctx.strokeStyle = FC + '99'; ctx.beginPath(); ctx.moveTo(x1, y(ep.f1)); ctx.lineTo(x0, y(ep.f0)); ctx.stroke(); ctx.setLineDash([]); }
   const bw = Math.max(1, cw * CFG.width);
-  cs.forEach((c, i) => {
+  if (CFG.line) {                                  // grafico de linea con los cierres: deja ver mejor donde se apoya el precio
+    ctx.strokeStyle = CFG.lineCol; ctx.lineWidth = 1.6; ctx.lineJoin = 'round'; ctx.beginPath();
+    cs.forEach((c, i) => { const x = i * cw + cw / 2, yy = y(usd(c.c)); if (i) ctx.lineTo(x, yy); else ctx.moveTo(x, yy); });
+    ctx.stroke(); ctx.lineWidth = 1;
+    if (cw >= 5) { ctx.fillStyle = CFG.lineCol; cs.forEach((c, i) => { ctx.beginPath(); ctx.arc(i * cw + cw / 2, y(usd(c.c)), 1.6, 0, 7); ctx.fill(); }); }
+  } else cs.forEach((c, i) => {
     const x = i * cw + cw / 2, upc = c.c >= c.o; ctx.strokeStyle = ctx.fillStyle = upc ? CFG.up : CFG.down;
     const yo = y(usd(c.o)), yc = y(usd(c.c)), top = Math.min(yo, yc), hgt = Math.max(1, Math.abs(yc - yo));
     const xl = Math.round(x) + .5;
@@ -582,7 +601,7 @@ function draw() {
   if (S.decision && S.decision.kind === 'entro') hline(S.decision.price, T.fg, 'Entrada ' + fmt(S.decision.price), y, pw, []);
   if (S.sl != null) hline(S.sl, '#e5534b', 'SL ' + fmt(S.sl), y, pw, [5, 3]);
   if (S.fibTmp) { const xt = xOfMin(S.fibTmp.minute); ctx.strokeStyle = FC; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(xt == null ? 12 : xt, y(S.fibTmp.price), 9, 0, 7); ctx.stroke(); ctx.lineWidth = 1; }
-  if (S.fibMode) { ctx.fillStyle = FC; ctx.font = '600 13px Inter, system-ui'; ctx.fillText(S.fibMode === 1 ? 'Toca el cuerpo de vela del nivel 1 (' + (ep.side > 0 ? 'mínimo' : 'máximo') + ' del tramo)' : 'Ahora toca el cuerpo del nivel 0 (' + (ep.side > 0 ? 'máximo' : 'mínimo') + ')', 10, 34); }
+  if (S.fibMode) { ctx.fillStyle = FC; ctx.font = '600 13px Inter, system-ui'; ctx.fillText(S.fibMode === 1 ? 'Arrastra la línea 1 o la 0, o toca el cuerpo del nivel 1 (' + (ep.side > 0 ? 'mínimo' : 'máximo') + ')' : 'Ahora toca el cuerpo del nivel 0 (' + (ep.side > 0 ? 'máximo' : 'mínimo') + ')', 10, 34); }
 }
 function hline(v, col, label, y, pw, dash) {
   const yy = Math.round(y(v)) + .5; ctx.setLineDash(dash); ctx.strokeStyle = col; ctx.beginPath(); ctx.moveTo(0, yy); ctx.lineTo(pw, yy); ctx.stroke(); ctx.setLineDash([]);
@@ -633,54 +652,94 @@ function restoreFib() {
 }
 // Arrastre de las lineas 1 y 0: se pulsa cerca de una de ellas y se mueve; al soltar se ajusta al cuerpo mas cercano.
 // Mientras se elige el SL, el Fibo queda bloqueado: tocar o arrastrar el grafico solo coloca y mueve el SL.
-let drag = null, slDrag = false, suppressClick = false;
+let drag = null, slDrag = false, pan = null, suppressClick = false, lastTap = 0;
+// Vista libre: off = velas desplazadas hacia el pasado; y = rango de precio fijado a mano (null = se ajusta solo).
+const view = { off:0, y:null, lastK:null };
+function resetView() { view.off = 0; view.y = null; view.lastK = null; }
+function viewMoved() { return view.off > 0 || !!view.y; }
 function setSl(p) {
   S.sl = Math.round(p * 100) / 100;
   const wrong = ep.side * (pending.price - S.sl) <= 0;
   $('ovSl').textContent = 'SL en ' + fmt(S.sl) + ' (riesgo ' + fmt(Math.abs(pending.price - S.sl)) + ' USD).' +
-    (wrong ? ' Ojo: está al otro lado de la entrada.' : ' Arrastra en el gráfico para moverlo.');
+    (wrong ? ' Ojo: está al otro lado de la entrada.' : ' Arrastra la línea del SL para moverlo.');
 }
+// Un dedo o el raton: cerca de una linea del Fibo la mueve (antes de decidir); cerca del SL lo mueve (al elegir el SL);
+// en cualquier otro sitio mueve el grafico. Sobre la escala de precios la estira o la encoge. Dos dedos: zoom.
+const ptrs = new Set();
 cv.addEventListener('pointerdown', ev => {
-  if (!S || !geo || pinch) return;
-  const r = cv.getBoundingClientRect();
-  if (S.phase === 'slpick' && pending) {
-    if (ev.clientX - r.left > geo.pw) return;
-    slDrag = true; setSl(priceAt(ev)); cv.setPointerCapture(ev.pointerId); ev.preventDefault(); return;
+  if (!S || !geo) return;
+  ptrs.add(ev.pointerId);
+  if (ptrs.size > 1 || pinch) { pan = null; slDrag = false; return; }
+  const r = cv.getBoundingClientRect(), x = ev.clientX - r.left, yy = ev.clientY - r.top, onAxis = x > geo.pw;
+  const Y = v => geo.ph - (v - geo.lo) / (geo.hi - geo.lo) * geo.ph, tol = ev.pointerType === 'touch' ? 22 : 10;
+  if (!onAxis && S.phase === 'slpick' && pending && S.sl != null && Math.abs(yy - Y(S.sl)) <= tol) {
+    slDrag = true; cv.setPointerCapture(ev.pointerId); ev.preventDefault(); return;
   }
-  if (S.phase !== 'live') return;
-  const yy = ev.clientY - r.top, Y = v => geo.ph - (v - geo.lo) / (geo.hi - geo.lo) * geo.ph;
-  const d1 = Math.abs(yy - Y(ep.f1)), d0 = Math.abs(yy - Y(ep.f0)), tol = ev.pointerType === 'touch' ? 22 : 10;
-  if (S.fibMode || Math.min(d1, d0) > tol || ev.clientX - r.left > geo.pw) return;
-  drag = { which:d1 <= d0 ? 1 : 0, resume:S.phase === 'live' && !S.paused, moved:false };
-  if (drag.resume) S.paused = true;
-  cv.setPointerCapture(ev.pointerId); ev.preventDefault(); refresh();
+  if (!onAxis && S.phase === 'live' && S.fibMode) {          // las lineas del Fibo solo se arrastran con Corregir Fibo activo
+    const d1 = Math.abs(yy - Y(ep.f1)), d0 = Math.abs(yy - Y(ep.f0));
+    if (Math.min(d1, d0) <= tol) {
+      drag = { which:d1 <= d0 ? 1 : 0, resume:false, moved:false };
+      cv.setPointerCapture(ev.pointerId); ev.preventDefault(); refresh(); return;
+    }
+  }
+  pan = { x0:ev.clientX, y0:ev.clientY, off0:view.off, yv:view.y || { lo:geo.lo, hi:geo.hi }, ymoved:!!view.y, axis:onAxis, moved:false, cw:geo.cw, ph:geo.ph };
+  cv.setPointerCapture(ev.pointerId); ev.preventDefault();
 });
 cv.addEventListener('pointermove', ev => {
   if (slDrag) { if (S.phase === 'slpick' && pending) setSl(priceAt(ev)); return; }
-  if (!drag) return;
-  drag.moved = true;
-  const p = snapBody(ev), cur = anchors();
-  if (drag.which === 1) applyFib(p, cur.z, true); else applyFib(cur.a, p, true);
+  if (drag) {
+    drag.moved = true;
+    const p = snapBody(ev), cur = anchors();
+    if (drag.which === 1) applyFib(p, cur.z, true); else applyFib(cur.a, p, true);
+    return;
+  }
+  if (!pan) return;
+  const dx = ev.clientX - pan.x0, dy = ev.clientY - pan.y0;
+  if (!pan.moved && Math.hypot(dx, dy) < 6) return;
+  pan.moved = true;
+  const rng = pan.yv.hi - pan.yv.lo;
+  if (pan.axis) {
+    const f = Math.exp(dy * 0.006), mid = (pan.yv.hi + pan.yv.lo) / 2;
+    view.y = { lo:mid - rng * f / 2, hi:mid + rng * f / 2 };
+  } else {
+    view.off = Math.max(0, Math.round(pan.off0 + dx / pan.cw)); view.lastK = null;
+    if (pan.ymoved || Math.abs(dy) > 12) { pan.ymoved = true; const sh = dy / pan.ph * rng; view.y = { lo:pan.yv.lo + sh, hi:pan.yv.hi + sh }; }
+  }
 });
 cv.addEventListener('pointerup', ev => {
+  ptrs.delete(ev.pointerId);
   if (slDrag) { slDrag = false; suppressClick = true; return; }
-  if (!drag) return;
-  const d = drag; drag = null; suppressClick = d.moved;
-  if (d.moved) banner('Fibo corregido · zona con ' + S.touches + ' toques', 2000);
-  if (d.resume) S.paused = false;
-  refresh();
+  if (drag) {
+    const d = drag; drag = null; suppressClick = d.moved;
+    if (d.moved) { banner('Fibo corregido · zona con ' + S.touches + ' toques', 2000); endFibMode(); }
+    refresh(); return;
+  }
+  if (!pan) return;
+  if (pan.moved) suppressClick = true;
+  else { const now = performance.now(); if (now - lastTap < 320) { resetView(); lastTap = 0; } else lastTap = now; }
+  pan = null;
 });
-cv.addEventListener('pointercancel', () => { slDrag = false; if (drag && drag.resume) S.paused = false; drag = null; refresh(); });
+cv.addEventListener('pointercancel', ev => {
+  ptrs.delete(ev.pointerId); slDrag = false; pan = null;
+  if (drag && drag.resume) S.paused = false; drag = null; refresh();
+});
 cv.addEventListener('click', ev => {
   if (!S || !geo) return;
   if (suppressClick) { suppressClick = false; return; }
   if (S.fibMode === 1) { S.fibTmp = snapBody(ev); S.fibMode = 2; return; }
   if (S.fibMode === 2) { const a = S.fibTmp; S.fibTmp = null; applyFib(a, snapBody(ev)); endFibMode(); return; }
-  if (S.phase === 'slpick' && pending) setSl(priceAt(ev));
+  if (S.phase === 'slpick' && pending && ev.clientX - cv.getBoundingClientRect().left <= geo.pw) setSl(priceAt(ev));
 });
-cv.addEventListener('wheel', ev => { ev.preventDefault(); nCandles = Math.max(20, Math.min(400, Math.round(nCandles * (ev.deltaY > 0 ? 1.15 : 0.87)))); }, { passive:false });
+// Rueda: sobre el grafico cambia cuantas velas se ven; sobre la escala de precios la estira o la encoge.
+cv.addEventListener('wheel', ev => {
+  ev.preventDefault(); if (!geo) return;
+  if (ev.clientX - cv.getBoundingClientRect().left > geo.pw) {
+    const y0 = view.y || { lo:geo.lo, hi:geo.hi }, f = ev.deltaY > 0 ? 1.12 : 0.89, mid = (y0.hi + y0.lo) / 2, h = (y0.hi - y0.lo) * f / 2;
+    view.y = { lo:mid - h, hi:mid + h };
+  } else nCandles = Math.max(20, Math.min(400, Math.round(nCandles * (ev.deltaY > 0 ? 1.15 : 0.87))));
+}, { passive:false });
 let pinch = null;
-cv.addEventListener('touchstart', ev => { if (ev.touches.length === 2) pinch = { d:tdist(ev), n:nCandles }; }, { passive:true });
+cv.addEventListener('touchstart', ev => { if (ev.touches.length === 2) { pinch = { d:tdist(ev), n:nCandles }; pan = null; } }, { passive:true });
 cv.addEventListener('touchmove', ev => { if (pinch && ev.touches.length === 2) { nCandles = Math.max(20, Math.min(400, Math.round(pinch.n * pinch.d / Math.max(20, tdist(ev))))); } }, { passive:true });
 cv.addEventListener('touchend', ev => { if (ev.touches.length < 2) pinch = null; });
 function tdist(ev) { const a = ev.touches[0], b = ev.touches[1]; return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY); }
@@ -812,6 +871,8 @@ $('bHideRes').addEventListener('click', () => { $('resultBox').hidden = true; ba
 
 // ---------- botones y teclado ----------
 $('bExport').addEventListener('click', exportDecisions);
+$('bLive').addEventListener('click', () => resetView());
+$('bType').addEventListener('click', () => { CFG.line = !CFG.line; cfgChanged(); });
 // Instalar y compartir (solo en la app publica: alli hay service worker y una URL que compartir).
 let installEvt = null;
 if (location.protocol === 'https:' && !/claude\.ai|claudeusercontent/.test(location.hostname)) $('appRow').hidden = false;
@@ -831,12 +892,14 @@ $('bShare').addEventListener('click', async () => {
 });
 // Panel de ajustes: cada cambio se aplica al momento y se guarda.
 const CF_CHK = { cfHollow:'hollow', cfGrid:'grid', cfBand:'band', cfStrip:'strip', cf618:'f618', cfDiag:'diag', cfLabels:'labels', cfAuto:'autoZona' };
-const CF_COL = { cfUp:'up', cfDown:'down', cfFib:'fib', cfTp:'tp' };
+const CF_COL = { cfUp:'up', cfDown:'down', cfFib:'fib', cfTp:'tp', cfLineCol:'lineCol' };
 function syncCfgUi() {
   for (const id in CF_CHK) $(id).checked = !!CFG[CF_CHK[id]];
   for (const id in CF_COL) $(id).value = CFG[CF_COL[id]];
   document.querySelectorAll('#cfTema button').forEach(b => b.classList.toggle('on', b.dataset.v === CFG.tema));
   document.querySelectorAll('#cfWidth button').forEach(b => b.classList.toggle('on', +b.dataset.v === CFG.width));
+  document.querySelectorAll('#cfType button').forEach(b => b.classList.toggle('on', !!+b.dataset.v === !!CFG.line));
+  $('bType').textContent = CFG.line ? 'Velas' : 'Línea';
   document.querySelectorAll('#cfFont button').forEach(b => b.classList.toggle('on', +b.dataset.v === CFG.font));
   document.querySelectorAll('#cfPreset button').forEach(b => b.classList.toggle('on', b.dataset.up === CFG.up && b.dataset.down === CFG.down));
 }
@@ -860,8 +923,10 @@ for (const id in CF_CHK) $(id).addEventListener('change', () => { CFG[CF_CHK[id]
 for (const id in CF_COL) $(id).addEventListener('input', () => { CFG[CF_COL[id]] = $(id).value; cfgChanged(); });
 document.querySelectorAll('#cfTema button').forEach(b => b.addEventListener('click', () => { CFG.tema = b.dataset.v; cfgChanged(); }));
 document.querySelectorAll('#cfWidth button').forEach(b => b.addEventListener('click', () => { CFG.width = +b.dataset.v; cfgChanged(); }));
+document.querySelectorAll('#cfType button').forEach(b => b.addEventListener('click', () => { CFG.line = !!+b.dataset.v; cfgChanged(); }));
 document.querySelectorAll('#cfFont button').forEach(b => b.addEventListener('click', () => { CFG.font = +b.dataset.v; cfgChanged(); }));
 document.querySelectorAll('#cfPreset button').forEach(b => b.addEventListener('click', () => { CFG.up = b.dataset.up; CFG.down = b.dataset.down; cfgChanged(); }));
+syncCfgUi();
 const ACTS = { pause:togglePause, ff:toggleFF, entro:() => decide('entro'), no_entro:() => decide('no_entro'), fib:startFib, orig:restoreFib, skip:skipCase, next:nextCase };
 document.querySelectorAll('[data-act]').forEach(b => b.addEventListener('click', () => ACTS[b.dataset.act]()));
 $('ovSave').addEventListener('click', () => save(true));
