@@ -1,9 +1,9 @@
 // Service worker: la app abre sin conexion y guarda los casos ya vistos.
-const SHELL = 'sim-shell-2fd28d7897', CASOS = 'sim-casos-v1';
+const SHELL = 'sim-shell-18bd746007', CASOS = 'sim-casos-v2';   // v2: casos de 4 h (cambia el nombre para no reutilizar los de 2 h)
 const FILES = ['./', 'index.html', 'manifest.webmanifest', 'casos/indice.json', 'iconos/icono-192.png', 'iconos/icono-512.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(SHELL).then(c => c.addAll(FILES)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => {
-  e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k.startsWith('sim-shell-') && k !== SHELL).map(k => caches.delete(k)))).then(() => self.clients.claim()));
+  e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => (k.startsWith('sim-shell-') && k !== SHELL) || (k.startsWith('sim-casos-') && k !== CASOS)).map(k => caches.delete(k)))).then(() => self.clients.claim()));
 });
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);

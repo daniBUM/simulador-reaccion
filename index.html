@@ -14,7 +14,7 @@
 <meta name="apple-mobile-web-app-title" content="Simulador">
 </head>
 <body>
-<script>window.SIM_VERSION="2fd28d7897";window.SIM_SUPA=null;</script>
+<script>window.SIM_VERSION="18bd746007";window.SIM_SUPA=null;</script>
 <title>Simulador de Reacción</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -782,7 +782,9 @@ function showResult() {
     if (S.sl != null && slAt < 0 && sd * (S.sl - exit) >= 0) slAt = i;
   }
   const when = i => i < 0 ? 'no' : 'sí, a los ' + Math.round((S.t[i] - S.t[i0]) / 60000) + ' min';
-  let txt = (d.kind === 'entro' ? 'Desde tu entrada' : 'Desde tu decisión') + ', en las 2 h siguientes:\n';
+  const left = Math.round((S.t[S.n - 1] - S.t[i0]) / 60000);
+  const span = left >= 90 ? (Math.round(left / 6) / 10).toString().replace('.', ',') + ' h' : left + ' min';
+  let txt = (d.kind === 'entro' ? 'Desde tu entrada' : 'Desde tu decisión') + ', en las ' + span + ' siguientes (hasta el final del caso):\n';
   txt += 'A favor como máximo: ' + fmt(mfe) + ' USD\nEn contra como máximo: ' + fmt(mae) + ' USD\n';
   txt += 'Llegó al Fib 0,50 (TP): ' + when(tpAt) + '\nRompió Fib 1 por más de 2 USD: ' + when(brokeAt);
   if (S.sl != null) txt += '\nTu SL (' + fmt(S.sl) + '): ' + when(slAt) + '\nPrimero llegó: ' + (tpAt >= 0 && (slAt < 0 || tpAt < slAt) ? 'TP' : slAt >= 0 ? 'SL' : 'ninguno');
