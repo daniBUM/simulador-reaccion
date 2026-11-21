@@ -14,7 +14,7 @@
 <meta name="apple-mobile-web-app-title" content="Simulador">
 </head>
 <body>
-<script>window.SIM_VERSION="e67a906b77";window.SIM_SUPA=null;</script>
+<script>window.SIM_VERSION="044e6b81e1";window.SIM_SUPA=null;</script>
 <title>Simulador de Reacción</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -86,15 +86,36 @@
              padding-left:max(16px, env(safe-area-inset-left, 0px)); padding-right:max(16px, env(safe-area-inset-right, 0px));
              padding-bottom:max(14px, env(safe-area-inset-bottom, 0px)); }
   }
+  /* Movil en horizontal: grafico a la izquierda y mandos compactos a la derecha. */
+  @media (max-width:999px) and (orientation:landscape) and (max-height:600px) {
+    .stage { grid-template-columns:minmax(0,1fr) 236px; grid-template-rows:none; }
+    .panel { border-top:0; border-left:1px solid var(--line); overflow:auto; gap:6px; padding-block:6px;
+             padding-left:8px; padding-right:max(8px, env(safe-area-inset-right, 0px)); }
+    .top { padding-block:4px; padding-left:max(10px, env(safe-area-inset-left, 0px)); }
+    #pLegPill, #pDone { display:none; }
+    .act2 { grid-template-columns:1fr 1fr; }
+    button { padding:5px 4px; font-size:12px; }
+    .big { padding:9px 4px; font-size:13px; }
+    #price { font-size:17px; } #clock { font-size:11px; }
+    .sheet { left:auto; right:0; top:0; bottom:0; width:min(320px, 60%); border-radius:12px 0 0 12px; overflow:auto;
+             padding-right:max(14px, env(safe-area-inset-right, 0px)); padding-bottom:14px; }
+    textarea { min-height:44px; }
+  }
+  .nav { display:flex; align-items:center; gap:4px; }
+  .nav button { padding:2px 10px; font-size:15px; line-height:1.2; border-radius:999px; }
 </style>
 
 <div class="app">
   <header class="top">
     <h1>Simulador de Reacción · XAUUSD</h1>
-    <span class="pill" id="pEp">Cargando…</span>
+    <span class="nav">
+      <button id="bPrev" aria-label="Caso anterior" title="Caso anterior">‹</button>
+      <span class="pill" id="pEp">Cargando…</span>
+      <button id="bFwd" aria-label="Caso siguiente" title="Caso siguiente">›</button>
+    </span>
     <span class="pill">Estructura <b id="pTf">–</b></span>
     <span class="pill"><b id="pSide">–</b></span>
-    <span class="pill">Tramo <b id="pLeg">–</b></span>
+    <span class="pill" id="pLegPill">Tramo <b id="pLeg">–</b></span>
     <span class="pill" id="pDone">Hechos 0</span>
   </header>
   <div class="stage">
@@ -116,11 +137,6 @@
         <button id="bOrig" data-act="orig">Fibo original</button>
         <button id="bSkip" data-act="skip">Saltar<kbd>S</kbd></button>
       </div>
-      <div id="resultBox" hidden>
-        <div class="lbl">Qué pasó después</div>
-        <div id="result"></div>
-        <button class="big" id="bNext" data-act="next" style="width:100%;margin-top:8px">Siguiente caso<kbd>→</kbd></button>
-      </div>
       <button id="bExport" hidden>Exportar mis decisiones</button>
       <div class="seg" id="appRow" hidden>
         <button id="bInstall" hidden>Instalar en este equipo</button>
@@ -135,6 +151,14 @@
         Zoom: rueda del ratón o dos dedos. Horas en UTC; la fecha va oculta.</p>
       </details>
     </aside>
+  </div>
+</div>
+<div class="sheet" id="resultBox" hidden>
+  <h2>Qué pasó después</h2>
+  <div id="result"></div>
+  <div class="row">
+    <button class="big on" id="bNext" data-act="next" style="flex:1">Siguiente caso<kbd>→</kbd></button>
+    <button id="bHideRes">Ver gráfico</button>
   </div>
 </div>
 <div class="scrim" id="scrim" hidden></div>
@@ -280,7 +304,7 @@ async function start() {
 async function load(p) {
   if (busy) return; busy = true;
   try {
-    pos = p; banner('Cargando caso…');
+    pos = p; banner('Cargando caso…'); closeSheet(); $('resultBox').hidden = true;
     ep = await (await fetch('casos/' + order[pos].id + '.json')).json();
     const n = ep.dt.length, t = new Float64Array(n), b = new Int32Array(n), a = new Int32Array(n);
     let ct = 0, cb = 0, si = 0, sp = ep.spc.length ? ep.spc[0][1] : 0;
@@ -591,6 +615,15 @@ function nextCase() {
   load(k >= 0 ? k : (pos + 1) % order.length);
 }
 function skipCase() { if (S && S.phase === 'live') nextCase(); }
+// Flechas de la barra superior: caso anterior o siguiente en cualquier momento (descarta lo que no se guardo).
+function goCase(step) {
+  if (busy || !order.length) return;
+  pending = null; closeSheet();
+  load((pos + step + order.length) % order.length);
+}
+$('bPrev').addEventListener('click', () => goCase(-1));
+$('bFwd').addEventListener('click', () => goCase(1));
+$('bHideRes').addEventListener('click', () => { $('resultBox').hidden = true; banner('Para seguir, pulsa › arriba', 2500); });
 
 // ---------- botones y teclado ----------
 $('bExport').addEventListener('click', exportDecisions);
@@ -630,7 +663,9 @@ document.addEventListener('keydown', ev => {
   else if (k === 'f') toggleFF();
   else if (k === 'c') startFib();
   else if (k === 's') skipCase();
-  else if (k === 'arrowright' || k === 'enter') { if (S && S.phase === 'done') nextCase(); else used = false; }
+  else if (k === 'enter') { if (S && S.phase === 'done') nextCase(); else used = false; }
+  else if (k === 'arrowright') { if (S && S.phase === 'done') nextCase(); else goCase(1); }
+  else if (k === 'arrowleft') goCase(-1);
   else if (k === 'escape') { if (S && S.fibMode) startFib(); else cancel(); }
   else if (k >= '1' && k <= '5') setView(TFS[+k - 1][1]);
   else if (k === '+') setSpeed(SPEEDS[Math.min(SPEEDS.length - 1, SPEEDS.indexOf(speed) + 1)]);
