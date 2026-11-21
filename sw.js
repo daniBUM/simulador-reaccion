@@ -12,7 +12,8 @@ self.addEventListener('fetch', e => {
     e.respondWith(caches.open(CASOS).then(c => c.match(e.request).then(hit => hit || fetch(e.request).then(r => { if (r.ok) c.put(e.request, r.clone()); return r; }))));
     return;
   }
-  e.respondWith(fetch(e.request).then(r => {                    // la app: primero la red, para recibir mejoras
+  // la app: primero la red y sin la cache de 10 min de GitHub Pages, para recibir las mejoras al momento
+  e.respondWith(fetch(url.href, { cache:'no-cache', credentials:'same-origin' }).then(r => {
     if (r.ok) { const copy = r.clone(); caches.open(SHELL).then(c => c.put(e.request, copy)); }
     return r;
   }).catch(() => caches.match(e.request).then(hit => hit || caches.match('index.html'))));
