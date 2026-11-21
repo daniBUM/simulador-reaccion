@@ -14,7 +14,7 @@
 <meta name="apple-mobile-web-app-title" content="Simulador">
 </head>
 <body>
-<script>window.SIM_VERSION="044e6b81e1";window.SIM_SUPA=null;</script>
+<script>window.SIM_VERSION="4c4e017f8b";window.SIM_SUPA=null;</script>
 <title>Simulador de Reacción</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -72,14 +72,33 @@
   .sheet h2 { margin:0; font-size:16px; }
   textarea { width:100%; min-height:60px; background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:6px; padding:8px; font:inherit; resize:vertical; }
   .muted { color:var(--muted); }
+  /* Mandos de reproduccion y Fibo: en escritorio dos filas (2 + 3 botones); en movil vertical una sola fila de 5. */
+  .ctl { display:grid; grid-template-columns:repeat(6, minmax(0,1fr)); gap:4px; }
+  .ctl > button { grid-column:span 2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .ctl > #bPause, .ctl > #bFF { grid-column:span 3; }
+  .extra { display:flex; flex-direction:column; gap:12px; }
+  .extra > button:only-child, .extra > #bExport { width:100%; }
+  .sm { display:none; }
   @media (hover:none) { kbd { display:none; } }
   @media (max-width:899px) {
+    .lg { display:none; } .sm { display:inline; }
     .stage { grid-template-columns:1fr; grid-template-rows:minmax(0,1fr) auto; }
-    .panel { border-left:0; border-top:1px solid var(--line); gap:8px; overflow:visible;
-             padding-left:max(12px, env(safe-area-inset-left, 0px)); padding-right:max(12px, env(safe-area-inset-right, 0px)); padding-block:8px; }
+    .panel { border-left:0; border-top:1px solid var(--line); gap:6px; overflow:visible;
+             padding-left:max(10px, env(safe-area-inset-left, 0px)); padding-right:max(10px, env(safe-area-inset-right, 0px));
+             padding-top:6px; padding-bottom:max(6px, env(safe-area-inset-bottom, 0px)); }
     .lbl { display:none; }
-    .act2 { grid-template-columns:1fr 1fr; }
-    .big { padding:12px 6px; font-size:14px; }
+    button { padding:6px 4px; font-size:13px; }
+    .seg { gap:3px; }
+    .ctl { grid-template-columns:repeat(5, minmax(0,1fr)); gap:3px; }
+    .ctl > button, .ctl > #bPause, .ctl > #bFF { grid-column:span 1; padding-inline:2px; }
+    .act2 { grid-template-columns:1fr 1fr; gap:6px; }
+    .big { padding:11px 6px; font-size:14px; }
+    .extra { flex-direction:row; gap:3px; }
+    .extra > #bExport, .extra > #appRow { flex:1; width:auto; }
+    .extra button { padding:4px; font-size:12px; color:var(--muted); }
+    #price { font-size:17px; } #clock { font-size:11px; }
+    .top { padding-block:5px; padding-left:max(10px, env(safe-area-inset-left, 0px)); padding-right:max(10px, env(safe-area-inset-right, 0px)); flex-wrap:nowrap; overflow:hidden; }
+    #pLegPill, #pDone { display:none; }
     .help { display:none; }
     .top h1 { display:none; }
     .sheet { left:0; right:0; top:auto; bottom:0; width:auto; border-radius:12px 12px 0 0;
@@ -94,6 +113,10 @@
     .top { padding-block:4px; padding-left:max(10px, env(safe-area-inset-left, 0px)); }
     #pLegPill, #pDone { display:none; }
     .act2 { grid-template-columns:1fr 1fr; }
+    .ctl { grid-template-columns:repeat(6, minmax(0,1fr)); }
+    .ctl > #bPause, .ctl > #bFF { grid-column:span 3; }
+    .ctl > #bFib, .ctl > #bOrig, .ctl > #bSkip { grid-column:span 2; }
+    .extra { flex-direction:column; }
     button { padding:5px 4px; font-size:12px; }
     .big { padding:9px 4px; font-size:13px; }
     #price { font-size:17px; } #clock { font-size:11px; }
@@ -113,7 +136,7 @@
       <span class="pill" id="pEp">Cargando…</span>
       <button id="bFwd" aria-label="Caso siguiente" title="Caso siguiente">›</button>
     </span>
-    <span class="pill">Estructura <b id="pTf">–</b></span>
+    <span class="pill"><span class="lg">Estructura </span><b id="pTf">–</b></span>
     <span class="pill"><b id="pSide">–</b></span>
     <span class="pill" id="pLegPill">Tramo <b id="pLeg">–</b></span>
     <span class="pill" id="pDone">Hechos 0</span>
@@ -124,23 +147,23 @@
       <div class="quote"><span id="price">–</span><span id="clock">–</span></div>
       <div><div class="lbl">Velas</div><div class="seg" id="tfRow"></div></div>
       <div><div class="lbl">Velocidad</div><div class="seg" id="spRow"></div></div>
-      <div class="seg">
+      <div class="ctl">
         <button id="bPause" data-act="pause">⏸ Pausa<kbd>Espacio</kbd></button>
-        <button id="bFF" data-act="ff">⏩ Hasta la zona<kbd>F</kbd></button>
+        <button id="bFF" data-act="ff">⏩<span class="lg"> Hasta la zona</span><span class="sm"> Zona</span><kbd>F</kbd></button>
+        <button id="bFib" data-act="fib"><span class="lg">Corregir Fibo</span><span class="sm">✎ Fibo</span><kbd>C</kbd></button>
+        <button id="bOrig" data-act="orig" title="Fibo original"><span class="lg">Fibo original</span><span class="sm">↺ Orig.</span></button>
+        <button id="bSkip" data-act="skip">Saltar<kbd>S</kbd></button>
       </div>
       <div class="act2">
         <button class="big" id="bEntro" data-act="entro">ENTRO</button>
         <button class="big" id="bNo" data-act="no_entro">NO ENTRO<kbd>N</kbd></button>
       </div>
-      <div class="seg">
-        <button id="bFib" data-act="fib">Corregir Fibo<kbd>C</kbd></button>
-        <button id="bOrig" data-act="orig">Fibo original</button>
-        <button id="bSkip" data-act="skip">Saltar<kbd>S</kbd></button>
-      </div>
-      <button id="bExport" hidden>Exportar mis decisiones</button>
-      <div class="seg" id="appRow" hidden>
-        <button id="bInstall" hidden>Instalar en este equipo</button>
-        <button id="bShare">Compartir la app</button>
+      <div class="extra">
+        <button id="bExport" hidden>Exportar mis decisiones</button>
+        <div class="seg" id="appRow" hidden>
+          <button id="bInstall" hidden>Instalar<span class="lg"> en este equipo</span></button>
+          <button id="bShare">Compartir<span class="lg"> la app</span></button>
+        </div>
       </div>
       <details class="help" open>
         <summary>Cómo usarlo</summary>
@@ -607,7 +630,7 @@ function showResult() {
 }
 function updateExport() {
   const b = $('bExport'); b.hidden = store.kind !== 'device';
-  if (!b.hidden) b.textContent = 'Exportar mis decisiones (' + Object.keys(deviceAll()).length + ')';
+  if (!b.hidden) b.innerHTML = 'Exportar<span class="lg"> mis decisiones</span> (' + Object.keys(deviceAll()).length + ')';
 }
 function nextCase() {
   if (busy) return;
