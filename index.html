@@ -14,7 +14,7 @@
 <meta name="apple-mobile-web-app-title" content="Simulador">
 </head>
 <body>
-<script>window.SIM_VERSION="b6accf1005";window.SIM_SUPA=null;</script>
+<script>window.SIM_VERSION="c11ee80ff7";window.SIM_SUPA=null;</script>
 <title>Simulador de Reacción</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -431,11 +431,19 @@ async function start() {
   await load(pos);
   requestAnimationFrame(loop);
 }
+// En la app publicada los casos van comprimidos (.json.gz, 3 veces menos); el servidor del PC los da sin comprimir.
+async function fetchCase(id) {
+  if (store.kind !== 'local' && 'DecompressionStream' in window) {
+    const r = await fetch('casos/' + id + '.json.gz');
+    if (r.ok) return await new Response(r.body.pipeThrough(new DecompressionStream('gzip'))).json();
+  }
+  return await (await fetch('casos/' + id + '.json')).json();
+}
 async function load(p) {
   if (busy) return; busy = true;
   try {
     pos = p; banner('Cargando caso…'); closeSheet(); $('resultBox').hidden = true;
-    ep = await (await fetch('casos/' + order[pos].id + '.json')).json();
+    ep = await fetchCase(order[pos].id);
     const n = ep.dt.length, t = new Float64Array(n), b = new Int32Array(n), a = new Int32Array(n);
     let ct = 0, cb = 0, si = 0, sp = ep.spc.length ? ep.spc[0][1] : 0;
     for (let i = 0; i < n; i++) {
